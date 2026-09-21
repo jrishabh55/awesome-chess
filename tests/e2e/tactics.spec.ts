@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 test('recognizes a verified queen sacrifice ending in forced mate', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('./');
   await page.getByRole('button', { name: 'Import game', exact: true }).click();
   await page
     .getByRole('textbox', { name: 'PGN or FEN' })

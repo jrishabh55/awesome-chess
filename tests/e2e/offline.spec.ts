@@ -4,7 +4,7 @@ test('PWA reloads and runs real Stockfish plus reviews with networking disabled'
   page,
   context,
 }) => {
-  await page.goto('/');
+  await page.goto('./');
   await page.evaluate(() => navigator.serviceWorker.ready);
   await page.getByRole('button', { name: 'Engine settings', exact: true }).click();
   await page.getByRole('combobox', { name: 'Engine build' }).selectOption('lite');
@@ -41,7 +41,7 @@ test('PWA reloads and runs real Stockfish plus reviews with networking disabled'
   });
 });
 test('failed engine download never reports offline readiness', async ({ page, context }) => {
-  await page.goto('/');
+  await page.goto('./');
   await page.evaluate(() => navigator.serviceWorker.ready);
   await page.getByRole('button', { name: 'Engine settings', exact: true }).click();
   await page.getByRole('combobox', { name: 'Engine build' }).selectOption('lite');

@@ -13,6 +13,9 @@ await walk('');
 files.push('/');
 for (const file of await readdir('dist/engine'))
   if (file.startsWith('manifest-') && file.endsWith('.json')) files.push('/engine/' + file);
-await writeFile('dist/shell-assets.json', JSON.stringify(files));
+await writeFile(
+  'dist/shell-assets.json',
+  JSON.stringify(files.map((file) => (file === '/' ? './' : file.slice(1)))),
+);
 const sw = await readFile('dist/sw.js', 'utf8');
 await writeFile('dist/sw.js', sw.replace('__BUILD_ID__', Date.now().toString()));

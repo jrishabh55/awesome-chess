@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 test('real Stockfish analysis, branch editing, and local reload', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto('/');
+  await page.goto('./');
   await expect(page.getByRole('grid', { name: 'Chessboard' })).toBeVisible();
   await page.getByRole('tab', { name: 'Analysis', exact: true }).click();
   await expect(page.locator('.engine-line')).toHaveCount(3, { timeout: 90000 });
@@ -22,7 +22,7 @@ test('real Stockfish analysis, branch editing, and local reload', async ({ page 
   expect(errors).toEqual([]);
 });
 test('imports a short completed game and reviews both players', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('./');
   await page.getByRole('button', { name: 'Import game', exact: true }).click();
   await page
     .getByRole('textbox', { name: 'PGN or FEN' })
@@ -45,7 +45,7 @@ test('imports a short completed game and reviews both players', async ({ page })
 });
 test('mobile board fits and touch drawing mode works', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/');
+  await page.goto('./');
   await page.getByRole('button', { name: 'Highlight squares', exact: true }).click();
   await page.getByRole('gridcell', { name: /^a3 / }).click();
   await expect(page.locator('.board-overlay rect')).toHaveCount(1);
@@ -53,7 +53,7 @@ test('mobile board fits and touch drawing mode works', async ({ page }) => {
   await page.screenshot({ path: 'test-results/mobile.png', fullPage: true });
 });
 test('paused engine never shows stale lines on another position', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('./');
   await page.getByRole('tab', { name: 'Analysis', exact: true }).click();
   await expect(page.locator('.engine-line')).toHaveCount(3);
   await page.getByRole('switch', { name: 'Engine analysis' }).click();

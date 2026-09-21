@@ -1,0 +1,59 @@
+name: Deploy Chess Room to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      VITE_BASE_PATH: /${{ github.event.repository.name }}/
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run prepare:assets
+      - run: npm test
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - name: Verify production app and offline engine at the Pages path
+        env:
+          TEST_URL: http://127.0.0.1:5174/${{ github.event.repository.name }}/
+        run: |
+          npm run preview -- --port 5174 > /tmp/chess-preview.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent "$TEST_URL" > /dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail --silent "$TEST_URL" > /dev/null
+          npm run test:e2e
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@v5
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

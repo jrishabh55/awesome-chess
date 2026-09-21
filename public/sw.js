@@ -1,11 +1,12 @@
-const SHELL = 'chess-room-__BUILD_ID__';
+const scopedUrl = (path) => new URL(path, self.registration.scope).href;
+const SHELL = `chess-room-${self.registration.scope}-__BUILD_ID__`;
 self.addEventListener('install', (event) =>
   event.waitUntil(
     (async () => {
-      const response = await fetch('/shell-assets.json', { cache: 'no-store' });
+      const response = await fetch(scopedUrl('shell-assets.json'), { cache: 'no-store' });
       const assets = await response.json();
       const cache = await caches.open(SHELL);
-      await cache.addAll(assets);
+      await cache.addAll(assets.map(scopedUrl));
     })(),
   ),
 );
@@ -22,12 +23,12 @@ self.addEventListener('fetch', (event) => {
       const shell = await caches.open(SHELL);
       const bundled = await shell.match(event.request, { ignoreVary: true });
       if (bundled) return bundled;
-      if (url.pathname.startsWith('/engine/')) {
+      if (url.href.startsWith(scopedUrl('engine/'))) {
         const build = url.searchParams.get('build');
         for (const name of await caches.keys())
           if (build && name.startsWith(`engine-${build}-`) && !name.endsWith('-staging')) {
             const cache = await caches.open(name);
-            if (await cache.match('/offline-ready')) {
+            if (await cache.match(scopedUrl('offline-ready'))) {
               const match = await cache.match(event.request);
               if (match) return match;
             }
@@ -38,7 +39,7 @@ self.addEventListener('fetch', (event) => {
         return await fetch(event.request);
       } catch (error) {
         if (event.request.mode === 'navigate') {
-          const index = await shell.match('/index.html');
+          const index = await shell.match(scopedUrl('index.html'));
           if (index) return index;
         }
         throw error;

@@ -1,3 +1,4 @@
+import { assetUrl } from '../app/asset-url';
 import { ENGINE_BUILD_ID } from '../engine/build';
 import type { EngineFlavor } from '../engine/types';
 interface Asset {
@@ -12,7 +13,7 @@ interface Manifest {
   assets: Asset[];
 }
 async function manifest(): Promise<Manifest> {
-  const r = await fetch(`/engine/manifest-${ENGINE_BUILD_ID}.json`);
+  const r = await fetch(assetUrl(`engine/manifest-${ENGINE_BUILD_ID}.json`));
   if (!r.ok) throw Error('Engine manifest is unavailable.');
   return r.json();
 }
@@ -25,8 +26,8 @@ export async function isAssetSetReady(flavor: EngineFlavor) {
     const m = await manifest();
     const cache = await caches.open(`engine-${m.buildId}-${flavor}`);
     for (const a of m.assets.filter((a) => a.flavor === flavor))
-      if (!(await cache.match(`${a.url}?build=${m.buildId}`))) return false;
-    return Boolean(await cache.match('/offline-ready'));
+      if (!(await cache.match(`${assetUrl(a.url)}?build=${m.buildId}`))) return false;
+    return Boolean(await cache.match(assetUrl('offline-ready')));
   } catch {
     return false;
   }
@@ -46,7 +47,10 @@ export async function downloadAssetSet(
   let loaded = 0;
   try {
     for (const asset of assets) {
-      const r = await fetch(`${asset.url}?build=${m.buildId}`, { signal, cache: 'no-store' });
+      const r = await fetch(`${assetUrl(asset.url)}?build=${m.buildId}`, {
+        signal,
+        cache: 'no-store',
+      });
       if (!r.ok || !r.body) throw Error('Engine download failed. Please retry.');
       const reader = r.body.getReader(),
         chunks: Uint8Array[] = [];
@@ -69,7 +73,7 @@ export async function downloadAssetSet(
       if (digest !== asset.sha256 || bytes.length !== asset.size)
         throw Error('Engine verification failed. Please retry the download.');
       await cache.put(
-        `${asset.url}?build=${m.buildId}`,
+        `${assetUrl(asset.url)}?build=${m.buildId}`,
         new Response(bytes, {
           headers: {
             'Content-Type': asset.url.endsWith('.wasm') ? 'application/wasm' : 'text/javascript',
@@ -80,14 +84,14 @@ export async function downloadAssetSet(
     const committed = await caches.open(name);
     for (const a of assets)
       await committed.put(
-        `${a.url}?build=${m.buildId}`,
-        (await cache.match(`${a.url}?build=${m.buildId}`))!,
+        `${assetUrl(a.url)}?build=${m.buildId}`,
+        (await cache.match(`${assetUrl(a.url)}?build=${m.buildId}`))!,
       );
     await committed.put(
-      `/engine/manifest-${ENGINE_BUILD_ID}.json`,
+      assetUrl(`engine/manifest-${ENGINE_BUILD_ID}.json`),
       new Response(JSON.stringify(m), { headers: { 'Content-Type': 'application/json' } }),
     );
-    await committed.put('/offline-ready', new Response('verified'));
+    await committed.put(assetUrl('offline-ready'), new Response('verified'));
     await navigator.storage?.persist?.();
   } finally {
     await caches.delete(staging);
@@ -96,7 +100,7 @@ export async function downloadAssetSet(
 export function registerOffline(onUpdate: () => void) {
   if (!('serviceWorker' in navigator) || import.meta.env.DEV) return;
   void navigator.serviceWorker
-    .register('/sw.js')
+    .register(assetUrl('sw.js'), { scope: import.meta.env.BASE_URL })
     .then((reg) => {
       if (reg.waiting) onUpdate();
       reg.addEventListener('updatefound', () => {

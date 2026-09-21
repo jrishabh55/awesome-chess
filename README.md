@@ -1,6 +1,19 @@
 # Chess Room
 
+[![Deploy to GitHub Pages](https://github.com/jrishabh55/awesome-chess/actions/workflows/pages.yml/badge.svg)](https://github.com/jrishabh55/awesome-chess/actions/workflows/pages.yml)
+
 A local-first chess review PWA with Stockfish 19, a playable analysis board, branching variations, opening recognition, and unlimited reviews. No account, server-side analysis, or AI API key is used.
+
+**[Open Chess Room](https://jrishabh55.github.io/awesome-chess/)** · [Scoring policy](docs/scoring.md) · [Architecture](docs/architecture.md)
+
+## Features
+
+- Stockfish 19 runs locally in a Web Worker, with full and lightweight builds, three best lines, signed evaluations, and mate scores.
+- Unlimited game reviews with all ten move classifications, accuracy for both players, approximate performance ratings, and opening/middlegame/endgame reports.
+- Playable sidelines, PGN variations, legal move indicators, board flipping, promotion, colored arrows, and square highlights.
+- Local coach explanations, guided key moments, retry exercises, and a clickable evaluation timeline.
+- Opening names and ECO codes from the Lichess opening database.
+- Local study library, PGN/FEN import, PGN export, JSON backups, and an installable offline PWA.
 
 ## Run locally
 
@@ -52,6 +65,25 @@ TEST_URL=http://127.0.0.1:5174 npm run test:e2e
 ```
 
 Browser tests expect a running server (`5173` by default); set `TEST_URL` for production. Chromium must be available to Playwright (`npx playwright install chromium` if needed). Offline tests run only when `TEST_URL` is set and require the production preview.
+
+## GitHub Pages
+
+GitHub Pages serves this app as static files over HTTPS. Stockfish uses its single-threaded WebAssembly build, so hosting does not require custom cross-origin isolation headers or an analysis server. Games and reviews stay in browser storage; the host only serves app assets. Localhost and the published site have separate browser storage—use JSON export/import to move studies between them.
+
+The [deployment workflow](.github/workflows/pages.yml) runs on pushes to `main` and can also be started manually. It installs pinned dependencies, prepares engine/opening assets, runs unit tests, builds at the repository path, and runs production browser tests (including offline Stockfish) before deploying. Generated engine binaries are deployment artifacts, not committed to Git.
+
+For a fork, enable **Settings → Pages → Build and deployment → Source → GitHub Actions**. The workflow derives its base path from the repository name. For a custom domain or a `username.github.io` repository, change `VITE_BASE_PATH` in the workflow to `/` and adjust `TEST_URL` to match.
+
+Reproduce the project-path deployment locally:
+
+```sh
+VITE_BASE_PATH=/awesome-chess/ npm run build
+VITE_BASE_PATH=/awesome-chess/ npm run preview -- --port 5174
+# In a second terminal:
+TEST_URL=http://127.0.0.1:5174/awesome-chess/ npm run test:e2e
+```
+
+Offline use requires one successful visit and **Settings → Make available offline**. Reviews have no daily quota. Work remains on your device, including when the app is opened from GitHub Pages.
 
 ## Source and licenses
 

@@ -1,3 +1,4 @@
+import { assetUrl } from './asset-url';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Chess } from 'chess.js';
 import {
@@ -561,7 +562,7 @@ export default function App() {
   const player = (color: Color) => (
     <div className="player-row">
       <div className={`player-avatar ${color}`}>
-        <img src={`/assets/pieces/${color}K.svg`} alt="" />
+        <img src={assetUrl(`assets/pieces/${color}K.svg`)} alt="" />
       </div>
       <div className="player-info">
         <strong>
@@ -603,7 +604,7 @@ export default function App() {
     <div className="app-shell">
       <aside className="sidebar">
         <a className="brand-mark" href="#" aria-label="Chess Room home">
-          <img src="/assets/icon.svg" alt="" />
+          <img src={assetUrl('assets/icon.svg')} alt="" />
         </a>
         <div className="nav-items">
           <button

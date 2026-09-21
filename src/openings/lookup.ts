@@ -1,3 +1,4 @@
+import { assetUrl } from '../app/asset-url';
 import { Chess } from 'chess.js';
 import type { Study } from '../chess/types';
 import { pathTo } from '../chess/tree';
@@ -15,7 +16,7 @@ export function setOpeningData(value: OpeningData) {
 }
 export function loadOpenings(): Promise<void> {
   if (!pending)
-    pending = fetch('/data/openings.json')
+    pending = fetch(assetUrl('data/openings.json'))
       .then((r) => {
         if (!r.ok) throw Error('Opening database unavailable');
         return r.json();

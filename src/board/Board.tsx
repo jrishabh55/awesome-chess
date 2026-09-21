@@ -1,3 +1,4 @@
+import { assetUrl } from '../app/asset-url';
 import { useEffect, useRef, useState } from 'react';
 import { Chess } from 'chess.js';
 import type { Color, Square, Mark, DrawingColor } from '../chess/types';
@@ -163,7 +164,7 @@ export function Board({
               {row === 7 && <span className="file-label">{square[0]}</span>}
               {piece && (
                 <img
-                  src={`/assets/pieces/${piece.color}${piece.type.toUpperCase()}.svg`}
+                  src={assetUrl(`assets/pieces/${piece.color}${piece.type.toUpperCase()}.svg`)}
                   alt=""
                   draggable={false}
                 />
@@ -245,7 +246,7 @@ export function Board({
                   }}
                 >
                   <img
-                    src={`/assets/pieces/${chess.turn()}${p.toUpperCase()}.svg`}
+                    src={assetUrl(`assets/pieces/${chess.turn()}${p.toUpperCase()}.svg`)}
                     alt={pieceNames[p]}
                   />
                 </button>
