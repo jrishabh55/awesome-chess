@@ -1,4 +1,4 @@
-import { it, expect } from 'vitest';
+import { it, expect, vi } from 'vitest';
 import { EngineClient } from './worker-client';
 class FakeWorker {
   onmessage: ((event: { data: string }) => void) | null = null;
@@ -67,4 +67,41 @@ it('returns the last complete depth instead of duplicate candidates from mixed d
     [11, 'd2d4'],
   ]);
   client.dispose();
+});
+
+it('allows a cold full-engine download to finish after two minutes', async () => {
+  vi.useFakeTimers();
+  class SlowDownloadWorker extends FakeWorker {
+    postMessage(command: string) {
+      if (command === 'uci') setTimeout(() => super.postMessage(command), 125000);
+      else super.postMessage(command);
+    }
+  }
+  const client = new EngineClient('full', () => new SlowDownloadWorker() as unknown as Worker);
+  try {
+    const result = client
+      .analyze(
+        {
+          id: 'cold-download',
+          position: {
+            rootFen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+            moves: [],
+          },
+          budget: { kind: 'depth', depth: 12 },
+          multiPv: 1,
+        },
+        new AbortController().signal,
+      )
+      .then(
+        (value) => ({ value, error: null }),
+        (error) => ({ value: null, error }),
+      );
+    await vi.advanceTimersByTimeAsync(126000);
+    const outcome = await result;
+    expect(outcome.error).toBeNull();
+    expect(outcome.value?.completed).toBe(true);
+  } finally {
+    client.dispose();
+    vi.useRealTimers();
+  }
 });

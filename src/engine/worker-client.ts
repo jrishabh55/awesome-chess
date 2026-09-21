@@ -70,7 +70,9 @@ export class EngineClient {
           Error('Stockfish could not load. Download its assets or choose the lightweight engine.'),
         );
       };
-      await this.waitFor('uciok', () => this.send('uci'), 120000);
+      // A cold 95 MB WASM download can exceed two minutes on a hosted connection.
+      // Keep the normal search timeouts short; only engine startup gets this budget.
+      await this.waitFor('uciok', () => this.send('uci'), this.flavor === 'full' ? 600000 : 120000);
       if (!/Stockfish 19\b/.test(this.engineId)) throw Error(`Unexpected engine: ${this.engineId}`);
       await this.waitFor('readyok', () => {
         this.send('setoption name Hash value 64');

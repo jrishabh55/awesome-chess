@@ -27,6 +27,8 @@ npm run dev
 
 Open the URL printed by Vite. Asset preparation downloads the pinned Lichess opening database and prepares the engine from the pinned npm package. The full Stockfish engine is about 95 MB; the optional Lite build is about 1.7 MB. Assets are served from this project, not a runtime CDN.
 
+On the hosted site, the full engine's first download can take several minutes on a slower connection. Choose **Settings → Engine build → Lite** for a faster start, or use **Make available offline** to download and verify the full engine with visible progress. Once saved offline, it does not need to download again for each visit.
+
 For the installable/offline app:
 
 ```sh
