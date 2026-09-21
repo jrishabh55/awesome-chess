@@ -27,6 +27,14 @@
   touch-action: none;
   overflow: visible;
 }
+.chessboard.is-sideline::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgb(255 255 255 / 10%);
+  pointer-events: none;
+  z-index: 6;
+}
 .square.light {
   background: #e9ecd2;
   color: #738d54;

@@ -591,6 +591,11 @@ export default function App() {
   );
   const displayResult = result?.positionKey === currentPositionKey ? result : null;
   const hideHints = Boolean(retry && !retry.revealed);
+  const isSideline =
+    !demo &&
+    !retry &&
+    study.selectedId !== study.rootId &&
+    !study.mainline.includes(study.selectedId);
   const bestMove = useStableEngineMove(
     JSON.stringify([
       study.id,
@@ -865,6 +870,7 @@ export default function App() {
                 disabled={retryBusy || Boolean(demo)}
                 badge={showBadge && !demo && !retry ? selectedAssessment?.primary : undefined}
                 hideHints={hideHints}
+                isSideline={isSideline}
               />
             </div>
             {player(bottom)}
@@ -954,21 +960,18 @@ export default function App() {
                 </button>
               </div>
             )}
-            {!demo &&
-              !retry &&
-              !study.mainline.includes(study.selectedId) &&
-              study.selectedId !== study.rootId && (
-                <div className="exploration-banner">
-                  <div>
-                    <strong>Sideline</strong>
-                    <span>Your original game is preserved.</span>
-                  </div>
-                  <button onClick={() => navigate(study.explorationOrigin || study.rootId)}>
-                    <ArrowLeft size={15} />
-                    Return to game
-                  </button>
+            {isSideline && (
+              <div className="exploration-banner">
+                <div>
+                  <strong>Sideline</strong>
+                  <span>Your original game is preserved.</span>
                 </div>
-              )}
+                <button onClick={() => navigate(study.explorationOrigin || study.rootId)}>
+                  <ArrowLeft size={15} />
+                  Return to game
+                </button>
+              </div>
+            )}
             {retry && (
               <div className="retry-card">
                 <div className="section-heading">

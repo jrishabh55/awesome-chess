@@ -36,6 +36,7 @@ interface Props {
   disabled?: boolean;
   badge?: Label;
   hideHints?: boolean;
+  isSideline?: boolean;
 }
 export function Board({
   fen,
@@ -51,6 +52,7 @@ export function Board({
   disabled,
   badge,
   hideHints,
+  isSideline = false,
 }: Props) {
   const boardRef = useRef<HTMLDivElement>(null);
   const gesture = useRef<{
@@ -131,7 +133,7 @@ export function Board({
         ref={boardRef}
         role="grid"
         aria-label="Chessboard"
-        className="chessboard"
+        className={`chessboard${isSideline ? ' is-sideline' : ''}`}
         onContextMenu={(e) => e.preventDefault()}
         onPointerDown={(e) => {
           if (e.button !== 0 && e.button !== 2) return;
