@@ -59,9 +59,9 @@ test('PWA reloads and runs real Stockfish plus reviews with networking disabled'
     .click();
   await page.getByRole('button', { name: 'Openings', exact: true }).click();
   await page
-    .getByRole('searchbox', { name: 'Opening name, variation, or ECO' })
+    .getByRole('combobox', { name: 'Opening name, variation, or ECO' })
     .fill('Sicilian Dragon');
-  const opening = page.locator('.ot-database-results button').first();
+  const opening = page.getByRole('option').first();
   await expect(opening).toBeVisible();
   await opening.click();
   await page.getByRole('button', { name: 'Learn selected opening', exact: true }).click();

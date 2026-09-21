@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowRight, BookOpen, Check, ChevronLeft, ChevronRight, RotateCcw, X } from 'lucide-react';
+import { ArrowRight, BookOpen, Check, ChevronRight, RotateCcw, X } from 'lucide-react';
 import { ModeBoard } from '../app/ModeBoard';
 import { BoardTools, type DrawingMode } from '../board/BoardTools';
 import { BoardNavigation } from '../board/BoardNavigation';
-import { OpeningDatabasePicker } from './OpeningDatabasePicker';
+import { OpeningLibrary } from './OpeningLibrary';
 import type { Color, DrawingColor, Mark, Square } from '../chess/types';
-import { builtInPacks, importPack, type OpeningPack } from './packs';
+import { builtInPacks, type OpeningPack } from './packs';
 import {
   createSession,
   currentLine,
@@ -42,11 +42,6 @@ export function OpeningTeacher(_props: { onBack?: () => void } = {}) {
   const [drawingColor, setDrawingColor] = useState<DrawingColor>('red');
   const [annotations, setAnnotations] = useState<Record<string, Mark[]>>({});
   const [dialog, setDialog] = useState<'catalog' | 'reset' | 'note' | null>(null);
-  const [catalogIndex, setCatalogIndex] = useState(0);
-  const [pgn, setPgn] = useState('');
-  const [importName, setImportName] = useState('My repertoire');
-  const [importSide, setImportSide] = useState<Color>('w');
-  const [error, setError] = useState('');
   const [storageError, setStorageError] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [hint, setHint] = useState(false);
@@ -64,7 +59,6 @@ export function OpeningTeacher(_props: { onBack?: () => void } = {}) {
   const finalIndex = session.stages
     .slice(0, session.stage)
     .filter((s) => s.kind === 'final').length;
-  const catalogPack = builtInPacks[catalogIndex];
   const fen = position(pack, session);
   const annotationKey = fen.split(' ').slice(0, 4).join(' ');
   const flip = () => setOrientation((value) => (value === 'w' ? 'b' : 'w'));
@@ -148,7 +142,6 @@ export function OpeningTeacher(_props: { onBack?: () => void } = {}) {
     setSession(nextSession);
     setActive(true);
     setDialog(null);
-    setError('');
     setHint(false);
     setRevealed(false);
     setFeedback('');
@@ -224,7 +217,6 @@ export function OpeningTeacher(_props: { onBack?: () => void } = {}) {
             <button
               className="ot-button"
               onClick={() => {
-                setError('');
                 setDialog('catalog');
               }}
             >
@@ -472,110 +464,10 @@ export function OpeningTeacher(_props: { onBack?: () => void } = {}) {
             <p>{move?.note}</p>
           </div>
         ) : (
-          <div className="ot-dialog-content">
+          <div className="ot-dialog-content ol-dialog-content">
             {dialog === 'catalog' && (
-              <OpeningDatabasePicker onChoose={(nextPack) => start(nextPack, true)} />
+              <OpeningLibrary onChoose={(nextPack) => start(nextPack, true)} />
             )}
-            <p className="ot-muted">
-              One guided tour and one drill for your first line. Each new line adds a tour and two
-              shuffled drills, including that new line. Finish by recalling every variation in
-              shuffled order.
-            </p>
-            <div className="ot-catalog-card">
-              <div className="ot-eyebrow">
-                Built-in repertoire · {catalogIndex + 1} / {builtInPacks.length}
-              </div>
-              <h3>{catalogPack.name}</h3>
-              <p>{catalogPack.description}</p>
-              <span className="ot-detail">
-                Play {colorName(catalogPack.side)} · {catalogPack.lines.length} variations
-              </span>
-              <ul>
-                {catalogPack.lines.map((item) => (
-                  <li key={item.name}>{item.name}</li>
-                ))}
-              </ul>
-              <div className="ot-navigation">
-                <button
-                  className="ot-button"
-                  aria-label="Previous opening"
-                  onClick={() =>
-                    setCatalogIndex((catalogIndex + builtInPacks.length - 1) % builtInPacks.length)
-                  }
-                >
-                  <ChevronLeft size={18} />
-                </button>
-                <button className="ot-primary" onClick={() => start(catalogPack)}>
-                  Start {catalogPack.name}
-                </button>
-                <button
-                  className="ot-button"
-                  aria-label="Next opening"
-                  onClick={() => setCatalogIndex((catalogIndex + 1) % builtInPacks.length)}
-                >
-                  <ChevronRight size={18} />
-                </button>
-              </div>
-            </div>
-            {(active || saved) && (
-              <p className="ot-muted">
-                Starting a course replaces the saved course on this device.
-              </p>
-            )}
-            <form
-              className="ot-import"
-              onSubmit={(event) => {
-                event.preventDefault();
-                try {
-                  start(importPack(pgn, importSide, importName), true);
-                } catch (reason) {
-                  setError(reason instanceof Error ? reason.message : 'Could not import this PGN.');
-                }
-              }}
-            >
-              <h3>Import your repertoire</h3>
-              <p className="ot-muted">
-                Paste PGN with variations and optional comments. Each complete branch becomes a
-                lesson. Up to 40 lines, 120 half-moves per line.
-              </p>
-              <label>
-                Repertoire name
-                <input
-                  value={importName}
-                  maxLength={80}
-                  onChange={(event) => setImportName(event.target.value)}
-                />
-              </label>
-              <label>
-                Train as
-                <select
-                  value={importSide}
-                  onChange={(event) => setImportSide(event.target.value as Color)}
-                >
-                  <option value="w">White</option>
-                  <option value="b">Black</option>
-                </select>
-              </label>
-              <label>
-                PGN variations
-                <textarea
-                  value={pgn}
-                  onChange={(event) => setPgn(event.target.value)}
-                  placeholder="1. e4 e5 (1... c5 2. Nf3) 2. Nf3 *"
-                  rows={5}
-                  required
-                  spellCheck={false}
-                />
-              </label>
-              {error && (
-                <p className="ot-feedback" role="alert">
-                  {error}
-                </p>
-              )}
-              <button className="ot-primary" type="submit">
-                Import and start
-              </button>
-            </form>
           </div>
         )}
       </dialog>

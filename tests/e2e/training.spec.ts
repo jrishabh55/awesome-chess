@@ -58,6 +58,7 @@ test('custom Black repertoire completes every stage with automatic White moves',
 }) => {
   await openTeacher(page);
   await page.getByRole('button', { name: 'Openings', exact: true }).click();
+  await page.getByRole('tab', { name: 'Import PGN', exact: true }).click();
   await page
     .getByRole('textbox', { name: 'Repertoire name', exact: true })
     .fill('Black mini course');
@@ -129,6 +130,7 @@ test('an unsavable PGN import preserves the previous course and explains the err
   await page.getByRole('button', { name: 'Start course', exact: true }).click();
   const previous = await page.evaluate(() => localStorage.getItem('chess-room.opening-teacher.v1'));
   await page.getByRole('button', { name: 'Openings', exact: true }).click();
+  await page.getByRole('tab', { name: 'Import PGN', exact: true }).click();
   await page.getByRole('textbox', { name: 'PGN variations', exact: true }).fill('1. d4 d5 *');
   await page.evaluate(() => {
     const original = Storage.prototype.setItem;
@@ -155,12 +157,12 @@ test('database search chooses a named Black line and keyboard navigation never b
 }) => {
   await openTeacher(page);
   await page.getByRole('button', { name: 'Openings', exact: true }).click();
-  const search = page.getByRole('searchbox', {
+  const search = page.getByRole('combobox', {
     name: 'Opening name, variation, or ECO',
     exact: true,
   });
   await search.fill('Sicilian Dragon');
-  const results = page.locator('.ot-database-results button');
+  const results = page.getByRole('option');
   await expect(results.first()).toContainText('Sicilian Defense');
   await expect(results.first()).toContainText('Dragon');
   await results.first().click();
@@ -208,6 +210,7 @@ test.describe('opening database network recovery', () => {
     await expect(page.getByRole('alert')).toContainText('Opening database unavailable');
     await page.unroute('**/data/*.tsv');
     await page.getByRole('button', { name: 'Retry opening database', exact: true }).click();
-    await expect(page.locator('.ot-database-results button').first()).toBeVisible();
+    await page.getByRole('combobox', { name: 'Opening name, variation, or ECO' }).fill('Sicilian');
+    await expect(page.getByRole('option').first()).toBeVisible();
   });
 });

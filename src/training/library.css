@@ -1,0 +1,396 @@
+.ol-dialog-content {
+  padding: 0;
+}
+.opening-library {
+  min-width: 0;
+}
+.ol-tabs {
+  display: flex;
+  gap: 3px;
+  padding: 10px 18px 0;
+  border-bottom: 1px solid #3d4435;
+}
+.ol-tabs button {
+  padding: 10px 9px;
+  font-size: 12px;
+  border-bottom: 2px solid transparent;
+  color: #aeb7a4;
+  white-space: nowrap;
+}
+.ol-tabs button[aria-selected='true'] {
+  color: #d5eab8;
+  border-bottom-color: #b6d68c;
+}
+.ol-tabs button:hover {
+  background: #333b2c;
+}
+.ol-content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 20px 20px;
+}
+.ol-content label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 11px;
+  color: #b9c2ad;
+  min-width: 0;
+}
+.ol-content input:not([role='combobox']),
+.ol-content select {
+  min-width: 0;
+  width: 100%;
+  color: #eff1e9;
+  background: #20251c;
+  border: 1px solid #4a523f;
+  border-radius: 6px;
+  padding: 8px 9px;
+  font-size: 12px;
+}
+.ol-content .ot-muted {
+  font-size: 11px;
+  line-height: 1.5;
+}
+.ol-content .ot-button,
+.ol-content .ot-primary {
+  font-size: 11px;
+  min-height: 33px;
+}
+.ol-family-filter {
+  width: 100%;
+}
+.ol-selected {
+  background: #303729;
+  border: 1px solid #536044;
+  padding: 12px;
+  border-radius: 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+.ol-selected > div:first-child {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+}
+.ol-eco {
+  color: #b6d68c;
+  font-size: 10px;
+  flex: none;
+  min-width: 27px;
+}
+.ol-selected details {
+  font-size: 11px;
+  color: #adb99f;
+}
+.ol-selected summary {
+  cursor: pointer;
+}
+.ol-moves {
+  margin-top: 7px;
+  color: #ced8c0;
+  line-height: 1.7;
+  font-size: 11px;
+}
+.ol-form-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 100px;
+  gap: 9px;
+  align-items: end;
+}
+.ol-practice-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.ol-practice-row > label {
+  margin-right: auto;
+  font-size: 10px;
+}
+.ol-practice-row select {
+  min-width: 95px;
+}
+.ol-add-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid #4b563f;
+}
+.ol-button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ol-button-row > button {
+  flex: 1;
+}
+.ol-section-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ol-section-heading > h3,
+.ol-section-heading > div {
+  flex: 1;
+  min-width: 0;
+}
+.ol-section-heading h3,
+.ol-section-heading > h3 {
+  font-size: 15px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.ol-section-heading > span {
+  font-size: 10px;
+  color: #9fab93;
+  white-space: nowrap;
+}
+.ol-family {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ol-variation-list {
+  border: 1px solid #3f4836;
+  border-radius: 7px;
+  overflow: hidden;
+}
+.ol-variation-list > button {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  padding: 9px 10px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+.ol-variation-list > button + button {
+  border-top: 1px solid #343c2e;
+}
+.ol-variation-list > button:hover {
+  background: #343e2a;
+}
+.ol-variation-list > button.selected {
+  background: #465739;
+  color: #e4efd7;
+}
+.ol-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #a8b29d;
+  font-size: 10px;
+}
+.ol-pagination button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 25px;
+  border-radius: 4px;
+  background: #333b2b;
+}
+.ol-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 9px;
+  padding: 20px 15px;
+  color: #a5b595;
+}
+.ol-empty p {
+  font-size: 13px;
+  line-height: 1.5;
+  max-width: 340px;
+}
+.ol-empty small {
+  font-size: 11px;
+  line-height: 1.5;
+  max-width: 335px;
+  color: #96a28a;
+}
+.ol-repertoire-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ol-repertoire-list > button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  text-align: left;
+  gap: 11px;
+  padding: 12px;
+  background: #303829;
+  border: 1px solid #444f38;
+  border-radius: 8px;
+}
+.ol-repertoire-list > button > span {
+  flex: 1;
+  min-width: 0;
+}
+.ol-repertoire-list strong {
+  display: block;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.ol-repertoire-list small {
+  display: block;
+  font-size: 10px;
+  margin-top: 4px;
+  color: #a8b698;
+}
+.ol-back {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 5px;
+  font-size: 11px;
+  color: #b8cea2;
+}
+.ol-inline-form {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+}
+.ol-inline-form label {
+  flex: 1;
+}
+.ol-delete {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  background: #44342d;
+  border-radius: 7px;
+  font-size: 12px;
+}
+.ol-repertoire-family {
+  border: 1px solid #404937;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.ol-repertoire-family h4 {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px;
+  font-size: 12px;
+  background: #343d2c;
+}
+.ol-repertoire-family h4 > span {
+  color: #a2b38f;
+}
+.ol-saved-variation {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px 4px 10px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+.ol-saved-variation > span:nth-child(2) {
+  flex: 1;
+  min-width: 0;
+}
+.ol-saved-variation + .ol-saved-variation {
+  border-top: 1px solid #353d2e;
+}
+.ol-error {
+  border-radius: 7px;
+  background: #44342d;
+  color: #f1c3a5;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.ol-error p + button {
+  margin-top: 8px;
+}
+.ol-notice {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #c1dca4;
+  font-size: 11px;
+  line-height: 1.4;
+}
+.ol-notice svg {
+  flex: none;
+}
+.ol-notice button {
+  margin-left: auto;
+  text-decoration: underline;
+  white-space: nowrap;
+}
+.ol-course-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ol-course-list > section {
+  padding: 14px;
+  border: 1px solid #49543d;
+  border-radius: 9px;
+  background: #30372a;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ol-course-list h3 {
+  font-size: 15px;
+}
+.ol-course-list p {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #c0cab4;
+}
+.ol-course-list small {
+  font-size: 10px;
+  color: #a4b394;
+}
+.ol-course-list button {
+  align-self: flex-start;
+}
+.ol-import {
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+@media (max-width: 600px) {
+  .ol-tabs {
+    padding: 8px 9px 0;
+    gap: 0;
+  }
+  .ol-tabs button {
+    flex: 1;
+    padding: 9px 4px;
+    font-size: 10px;
+  }
+  .ol-content {
+    padding: 13px;
+    gap: 12px;
+  }
+  .ol-selected {
+    padding: 10px;
+  }
+  .ol-practice-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .ol-practice-row > label {
+    grid-column: 1/-1;
+    width: 100%;
+  }
+  .ol-practice-row label select {
+    width: 100%;
+  }
+  .ol-practice-row button {
+    font-size: 10px;
+  }
+}

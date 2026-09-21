@@ -1,0 +1,159 @@
+.opening-combobox {
+  min-width: 0;
+  width: 100%;
+}
+.opening-combobox .oc-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  margin-bottom: 7px;
+  color: #d5dacd;
+}
+.oc-anchor {
+  position: relative;
+}
+.oc-field {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #20251c;
+  border: 1px solid #4a523f;
+  border-radius: 8px;
+  padding: 0 7px 0 11px;
+}
+.oc-field:focus-within {
+  border-color: var(--accent, #b6d68c);
+  box-shadow: 0 0 0 1px var(--accent, #b6d68c);
+}
+.oc-field.is-disabled {
+  opacity: 0.5;
+}
+.oc-search-icon {
+  flex: none;
+  color: #9da990;
+}
+.opening-combobox .oc-input {
+  width: 100%;
+  min-width: 0;
+  height: 39px;
+  padding: 8px 2px;
+  margin: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  box-shadow: none;
+  color: #ecede6;
+  font-size: 13px;
+  text-overflow: ellipsis;
+}
+.opening-combobox .oc-input::placeholder {
+  color: #929c87;
+}
+.opening-combobox .oc-icon-button {
+  display: grid;
+  place-items: center;
+  flex: none;
+  min-width: 27px;
+  width: 27px;
+  height: 29px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #b8c2ac;
+}
+.opening-combobox .oc-icon-button:hover {
+  background: #3b4332;
+  color: #ecede6;
+}
+.oc-toggle svg {
+  transition: transform 0.12s;
+}
+.oc-field.is-open .oc-toggle svg {
+  transform: rotate(180deg);
+}
+.oc-popover {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #566448;
+  border-radius: 8px;
+  background: #292f23;
+  box-shadow: 0 12px 35px #0007;
+  overflow: hidden;
+}
+.oc-popover.is-above {
+  top: auto;
+  bottom: calc(100% + 5px);
+}
+.oc-listbox {
+  flex: 1;
+  min-height: 0;
+  max-height: 320px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #60714f transparent;
+  padding: 4px;
+}
+.oc-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 39px;
+  padding: 7px 9px;
+  border-radius: 5px;
+  color: #e3e8da;
+  cursor: pointer;
+}
+.oc-option.is-active {
+  background: #415332;
+}
+.oc-option.is-selected {
+  color: #c7e8a6;
+}
+.oc-eco {
+  flex: none;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: #b9d999;
+  width: 27px;
+}
+.oc-name {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  flex: 1;
+  font-size: 12px;
+  line-height: 1.35;
+}
+.oc-option > svg {
+  flex: none;
+  color: #b6d68c;
+}
+.oc-result-status {
+  flex: none;
+  border-top: 1px solid #434d38;
+  padding: 8px 12px;
+  color: #aebba0;
+  font-size: 10px;
+  line-height: 1.4;
+}
+@media (max-width: 600px) {
+  .opening-combobox .oc-input {
+    font-size: 16px;
+  }
+  .oc-name {
+    font-size: 12px;
+  }
+}
