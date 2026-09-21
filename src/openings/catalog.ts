@@ -55,6 +55,17 @@ export function searchOpeningCatalog(
   const matches = entries.filter((entry) =>
     words.every((word) => normalize(`${entry.eco} ${entry.name}`).includes(word)),
   );
+  if (words.length) {
+    const phrase = words.join(' ');
+    const rank = (entry: CatalogOpening) => {
+      const name = normalize(entry.name);
+      if (name === phrase || entry.eco.toLowerCase() === phrase) return 0;
+      if (name.startsWith(phrase)) return 1;
+      if (name.includes(phrase)) return 2;
+      return 3;
+    };
+    matches.sort((a, b) => rank(a) - rank(b) || a.name.length - b.name.length);
+  }
   const pages = Math.max(1, Math.ceil(matches.length / pageSize));
   const page = Math.max(0, Math.min(pages - 1, requestedPage));
   return {

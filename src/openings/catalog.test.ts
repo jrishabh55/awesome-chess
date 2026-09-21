@@ -75,3 +75,15 @@ it('matches common apostrophe spellings of opening names', () => {
     expect(searchOpeningCatalog(entries, query).items[0]?.eco).toBe('D06');
   expect(searchOpeningCatalog(entries, 'kings indian').items[0]?.eco).toBe('E60');
 });
+
+it('puts the named opening ahead of incidental matches and longer variations', () => {
+  const entries = parseOpeningCatalog(
+    "eco\tname\tpgn\nA04\tZukertort Opening: Queen's Gambit Invitation\t1. Nf3 d5\nD37\tQueen's Gambit Declined\t1. d4 d5 2. c4 e6\nD06\tQueen's Gambit\t1. d4 d5 2. c4\nA43\tQueen's Pawn Game: Liedmann Gambit\t1. d4 c5 2. c4\n",
+  );
+  expect(searchOpeningCatalog(entries, 'queens gambit').items.map((entry) => entry.eco)).toEqual([
+    'D06',
+    'D37',
+    'A04',
+    'A43',
+  ]);
+});
