@@ -87,6 +87,8 @@ TEST_URL=http://127.0.0.1:5174/awesome-chess/ npm run test:e2e
 
 Offline use requires one successful visit, the app shell to finish caching, and the automatic engine download to finish. **Settings → Make available offline** lets you verify the selected engine again. Reviews have no daily quota. Work remains on your device, including when the app is opened from GitHub Pages.
 
+When an update is offered, **Save & update** saves the current study and review before activating the new app. The button shows saving/updating progress and offers **Retry update** if activation fails. Updates refresh the app shell without clearing your study library or downloaded engines.
+
 ## Source and licenses
 
 This application's source is GPL-3.0-or-later; see [LICENSE](LICENSE). Stockfish is GPLv3 and its exact corresponding-source link is recorded in the engine manifest. Opening data is CC0; the Cburnett pieces are CC BY-SA 3.0. See [third-party notices](THIRD_PARTY_NOTICES.md) and `public/licenses/`.

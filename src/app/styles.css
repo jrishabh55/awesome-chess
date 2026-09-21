@@ -1947,3 +1947,19 @@ h1 {
   border-radius: 6px;
   color-scheme: dark;
 }
+.update-banner button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+}
+.update-banner button:disabled {
+  cursor: wait;
+  opacity: 0.75;
+}
+.update-error {
+  margin: 6px 0 0;
+  color: #f0b1a5;
+  font-size: 12px;
+  line-height: 1.5;
+}

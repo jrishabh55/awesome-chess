@@ -142,7 +142,9 @@ export default function App() {
   const [offlineReady, setOfflineReady] = useState(false),
     [downloadProgress, setDownloadProgress] = useState<number | null>(null),
     [downloadSize, setDownloadSize] = useState(0),
-    [updateAvailable, setUpdateAvailable] = useState(false);
+    [updateAvailable, setUpdateAvailable] = useState(false),
+    [updateStatus, setUpdateStatus] = useState<'idle' | 'saving' | 'activating'>('idle'),
+    [updateError, setUpdateError] = useState('');
   const saved =
     savedRevision === `${study.id}:${study.revision}`
       ? 'Saved on this device'
@@ -629,6 +631,47 @@ export default function App() {
       </span>
     </div>
   );
+  const saveAndUpdate = async () => {
+    if (updateStatus !== 'idle') return;
+    setUpdateError('');
+    setUpdateStatus('saving');
+    const snapshot = currentStudy.current;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        Promise.all([
+          saveStudy(snapshot),
+          setPreference('activeStudy', snapshot.id),
+          ...(analysisLoaded.current && Object.keys(assessmentRef.current).length > 0
+            ? [
+                saveAnalysis(snapshot.id, {
+                  flavor,
+                  engineBuild: ENGINE_BUILD_ID,
+                  records: assessmentRef.current,
+                }),
+              ]
+            : []),
+        ]),
+        new Promise((_, reject) => {
+          timer = setTimeout(
+            () =>
+              reject(
+                Error('Saving is taking too long. Please retry; the update has not been applied.'),
+              ),
+            10000,
+          );
+        }),
+      ]);
+      clearTimeout(timer);
+      setUpdateStatus('activating');
+      await activateUpdate();
+    } catch (error) {
+      setUpdateError(errorMessage(error));
+      setUpdateStatus('idle');
+    } finally {
+      clearTimeout(timer);
+    }
+  };
   const clearMarks = () =>
     setStudy((s) => {
       if (demo || retry || !s.nodes[s.selectedId].marks.length) return s;
@@ -737,16 +780,30 @@ export default function App() {
           </div>
         )}
         {updateAvailable && (
-          <div className="update-banner">
-            An update is ready.
-            <button
-              onClick={() => {
-                void saveStudy(study)
-                  .then(activateUpdate)
-                  .catch((e) => setError(errorMessage(e)));
-              }}
-            >
-              Save & update
+          <div className="update-banner" role="status" aria-live="polite">
+            <div>
+              <span>
+                {updateStatus === 'saving'
+                  ? 'Saving your game…'
+                  : updateStatus === 'activating'
+                    ? 'Applying update… The app will reload.'
+                    : 'An update is ready.'}
+              </span>
+              {updateError && (
+                <p className="update-error" role="alert">
+                  {updateError}
+                </p>
+              )}
+            </div>
+            <button onClick={saveAndUpdate} disabled={updateStatus !== 'idle'}>
+              {updateStatus !== 'idle' && <LoaderCircle size={15} className="spin" />}
+              {updateStatus === 'saving'
+                ? 'Saving…'
+                : updateStatus === 'activating'
+                  ? 'Updating…'
+                  : updateError
+                    ? 'Retry update'
+                    : 'Save & update'}
             </button>
           </div>
         )}

@@ -1,6 +1,10 @@
 import { assetUrl } from '../app/asset-url';
 import { ENGINE_BUILD_ID } from '../engine/build';
 import type { EngineFlavor } from '../engine/types';
+const documentController =
+  typeof navigator !== 'undefined' && 'serviceWorker' in navigator
+    ? navigator.serviceWorker.controller
+    : undefined;
 interface Asset {
   url: string;
   size: number;
@@ -105,7 +109,7 @@ export async function downloadAssetSet(
 export function registerOffline(onUpdate: () => void) {
   if (!('serviceWorker' in navigator) || import.meta.env.DEV) return;
   void navigator.serviceWorker
-    .register(assetUrl('sw.js'), { scope: import.meta.env.BASE_URL })
+    .register(assetUrl('sw.js'), { scope: import.meta.env.BASE_URL, updateViaCache: 'none' })
     .then((reg) => {
       if (reg.waiting) onUpdate();
       reg.addEventListener('updatefound', () => {
@@ -116,10 +120,97 @@ export function registerOffline(onUpdate: () => void) {
     })
     .catch(() => {});
 }
+function deadline<T>(promise: Promise<T>, milliseconds: number, message: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(Error(message)), milliseconds);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+function installed(worker: ServiceWorker): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(
+      () => finish(Error('The update is still downloading. Please try again.')),
+      30000,
+    );
+    const finish = (error?: Error) => {
+      clearTimeout(timer);
+      worker.removeEventListener('statechange', changed);
+      if (error) reject(error);
+      else resolve();
+    };
+    const changed = () => {
+      if (['installed', 'activating', 'activated'].includes(worker.state)) finish();
+      else if (worker.state === 'redundant')
+        finish(Error('The update could not finish downloading. Please retry.'));
+    };
+    worker.addEventListener('statechange', changed);
+    changed();
+  });
+}
 export async function activateUpdate() {
-  const reg = await navigator.serviceWorker.getRegistration();
-  reg?.waiting?.postMessage('ACTIVATE');
-  navigator.serviceWorker.addEventListener('controllerchange', () => location.reload(), {
-    once: true,
+  const container = navigator.serviceWorker;
+  const reg = await container.getRegistration(assetUrl(''));
+  if (!reg)
+    throw Error('No app update is ready. Reload the page and try again. Your game is saved.');
+  if (
+    !reg.waiting &&
+    container.controller &&
+    documentController !== undefined &&
+    container.controller !== documentController
+  ) {
+    // Another tab activated the new cached shell; no network check is needed.
+    location.reload();
+    return;
+  }
+  if (!reg.waiting) {
+    await deadline(
+      reg.update(),
+      30000,
+      'Could not check for an update. Check your connection and retry.',
+    );
+    if (reg.installing) await installed(reg.installing);
+  }
+  const waiting = reg.waiting;
+  if (!waiting) {
+    // Another tab may already have activated it while this banner was visible.
+    if (reg.active) {
+      location.reload();
+      return;
+    }
+    throw Error('No app update is ready yet. Please retry.');
+  }
+  await new Promise<void>((resolve, reject) => {
+    const previous = container.controller;
+    const timer = setTimeout(
+      () => finish(Error('The update did not activate. Your game is saved; please retry.')),
+      15000,
+    );
+    const finish = (error?: Error) => {
+      clearTimeout(timer);
+      container.removeEventListener('controllerchange', changed);
+      if (error) reject(error);
+      else {
+        location.reload();
+        resolve();
+      }
+    };
+    const changed = () => {
+      if (container.controller && container.controller !== previous) finish();
+    };
+    container.addEventListener('controllerchange', changed);
+    try {
+      waiting.postMessage('ACTIVATE');
+    } catch (error) {
+      finish(error instanceof Error ? error : Error(String(error)));
+    }
   });
 }

@@ -6,13 +6,14 @@ self.addEventListener('install', (event) =>
       const response = await fetch(scopedUrl('shell-assets.json'), { cache: 'no-store' });
       const assets = await response.json();
       const cache = await caches.open(SHELL);
-      await cache.addAll(assets.map(scopedUrl));
+      // Do not copy an older release from the browser's HTTP cache into this shell.
+      await cache.addAll(assets.map((path) => new Request(scopedUrl(path), { cache: 'reload' })));
     })(),
   ),
 );
 self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
 self.addEventListener('message', (event) => {
-  if (event.data === 'ACTIVATE') self.skipWaiting();
+  if (event.data === 'ACTIVATE') event.waitUntil(self.skipWaiting());
 });
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET' || new URL(event.request.url).origin !== self.location.origin)
