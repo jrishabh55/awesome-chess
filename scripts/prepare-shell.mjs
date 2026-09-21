@@ -5,8 +5,7 @@ async function walk(path) {
     const file = path + '/' + e.name;
     if (e.isDirectory()) {
       if (!['engine', 'licenses'].includes(e.name)) await walk(file);
-    } else if (!file.endsWith('.tsv') && !['/sw.js', '/shell-assets.json'].includes(file))
-      files.push(file);
+    } else if (!['/sw.js', '/shell-assets.json'].includes(file)) files.push(file);
   }
 }
 await walk('');

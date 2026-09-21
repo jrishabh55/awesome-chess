@@ -2,7 +2,10 @@ import { expect, test, type Page } from '@playwright/test';
 
 async function openTeacher(page: Page) {
   await page.goto('./');
-  await page.getByRole('combobox', { name: 'Workspace', exact: true }).selectOption('teacher');
+  await page
+    .getByRole('navigation', { name: 'Workspace', exact: true })
+    .getByRole('button', { name: 'Opening teacher', exact: true })
+    .click();
   await expect(page.getByRole('heading', { name: 'Opening Teacher', exact: true })).toBeVisible();
 }
 async function move(page: Page, from: string, to: string) {
@@ -12,7 +15,7 @@ async function move(page: Page, from: string, to: string) {
   await page.keyboard.press('Enter');
 }
 async function finishGuide(page: Page) {
-  while (await page.getByRole('button', { name: 'Next move', exact: true }).isVisible()) {
+  while (await page.getByRole('button', { name: 'Next move', exact: true }).isEnabled()) {
     await page.getByRole('button', { name: 'Next move', exact: true }).click();
   }
   await page.getByRole('button', { name: 'Start practice', exact: true }).click();
@@ -25,7 +28,7 @@ test('opening teacher guides, validates drills, and resumes locally', async ({ p
   await expect(page.locator('.board-overlay')).toBeVisible();
   await expect(page.locator('.board-overlay > path')).toHaveCount(1);
   await page.getByRole('button', { name: 'Next move', exact: true }).click();
-  await page.getByRole('button', { name: 'Back', exact: true }).click();
+  await page.getByRole('button', { name: 'Previous move', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'White plays e4' })).toBeVisible();
   await finishGuide(page);
   await move(page, 'd2', 'd4');
@@ -39,8 +42,11 @@ test('opening teacher guides, validates drills, and resumes locally', async ({ p
   await move(page, 'e2', 'e4');
   await expect(page.getByRole('gridcell', { name: 'e5 black pawn', exact: true })).toBeVisible();
   await page.reload();
-  if (await page.getByRole('combobox', { name: 'Workspace', exact: true }).isVisible()) {
-    await page.getByRole('combobox', { name: 'Workspace', exact: true }).selectOption('teacher');
+  if (await page.getByRole('navigation', { name: 'Workspace', exact: true }).isVisible()) {
+    await page
+      .getByRole('navigation', { name: 'Workspace', exact: true })
+      .getByRole('button', { name: 'Opening teacher', exact: true })
+      .click();
   }
   await page.getByRole('button', { name: 'Resume course', exact: true }).click();
   await expect(page.getByRole('gridcell', { name: 'e4 white pawn', exact: true })).toBeVisible();
@@ -97,7 +103,7 @@ for (const viewport of [
     const geometry = await page.locator('.opening-teacher').evaluate((element) => {
       const board = element.querySelector('.chessboard')!.getBoundingClientRect();
       const button = Array.from(element.querySelectorAll('button'))
-        .find((b) => b.textContent?.includes('Next move'))!
+        .find((b) => b.getAttribute('aria-label') === 'Next move')!
         .getBoundingClientRect();
       return {
         documentHeight: document.documentElement.scrollHeight,
@@ -142,4 +148,66 @@ test('an unsavable PGN import preserves the previous course and explains the err
   );
   await page.getByRole('button', { name: 'Close opening dialog', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Quiet development', exact: true })).toBeVisible();
+});
+
+test('database search chooses a named Black line and keyboard navigation never bypasses drills', async ({
+  page,
+}) => {
+  await openTeacher(page);
+  await page.getByRole('button', { name: 'Openings', exact: true }).click();
+  const search = page.getByRole('searchbox', {
+    name: 'Opening name, variation, or ECO',
+    exact: true,
+  });
+  await search.fill('Sicilian Dragon');
+  const results = page.locator('.ot-database-results button');
+  await expect(results.first()).toContainText('Sicilian Defense');
+  await expect(results.first()).toContainText('Dragon');
+  await results.first().click();
+  await page
+    .getByRole('combobox', { name: 'Practice database line as', exact: true })
+    .selectOption('b');
+  await page.getByRole('button', { name: 'Learn selected opening', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'White plays e4', exact: true })).toBeVisible();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByRole('heading', { name: 'Black plays c5', exact: true })).toBeVisible();
+  await page.keyboard.press('ArrowLeft');
+  await expect(page.getByRole('heading', { name: 'White plays e4', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Openings', exact: true }).click();
+  await search.fill('B90');
+  await page.keyboard.press('ArrowRight');
+  await page.getByRole('button', { name: 'Close opening dialog', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'White plays e4', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Go to end', exact: true }).click();
+  await page.getByRole('button', { name: 'Start practice', exact: true }).click();
+  await expect(page.getByRole('gridcell', { name: 'e4 white pawn', exact: true })).toBeVisible();
+  await page.keyboard.press('ArrowRight');
+  await expect(
+    page.getByRole('heading', { name: 'Your move as Black', exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole('gridcell', { name: 'c7 black pawn', exact: true })).toBeVisible();
+  const firstSquare = await page.getByRole('gridcell').first().getAttribute('aria-label');
+  await page.getByRole('button', { name: 'Flip board', exact: true }).click();
+  expect(await page.getByRole('gridcell').first().getAttribute('aria-label')).not.toBe(firstSquare);
+  await page.getByRole('button', { name: 'Highlight squares', exact: true }).click();
+  await page.getByRole('gridcell', { name: 'c7 black pawn', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.board-overlay > rect')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Clear annotations', exact: true }).click();
+  await expect(page.locator('.board-overlay > rect')).toHaveCount(0);
+});
+
+test.describe('opening database network recovery', () => {
+  test.use({ serviceWorkers: 'block' });
+  test('the opening database shows a recoverable loading failure', async ({ page }) => {
+    await page.route('**/data/*.tsv', (route) =>
+      route.fulfill({ status: 503, body: 'unavailable' }),
+    );
+    await openTeacher(page);
+    await page.getByRole('button', { name: 'Openings', exact: true }).click();
+    await expect(page.getByRole('alert')).toContainText('Opening database unavailable');
+    await page.unroute('**/data/*.tsv');
+    await page.getByRole('button', { name: 'Retry opening database', exact: true }).click();
+    await expect(page.locator('.ot-database-results button').first()).toBeVisible();
+  });
 });

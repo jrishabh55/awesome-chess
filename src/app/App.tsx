@@ -1,35 +1,23 @@
 import { assetUrl } from './asset-url';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import { Chess } from 'chess.js';
 import {
   BookOpen,
-  ChevronLeft,
   ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
   Download,
   Upload,
   Settings2,
   RotateCcw,
   ArrowUpRight,
-  ArrowDownUp,
-  MousePointer2,
-  Square,
-  Trash2,
   Pause,
   Play,
   X,
-  FolderOpen,
   WifiOff,
   Check,
   ArrowLeft,
   GraduationCap,
-  Activity,
   ChartNoAxesCombined,
   ScanLine,
-  Eraser,
-  PanelLeftClose,
-  Flag,
   CheckCircle2,
   Copy,
   Info,
@@ -45,7 +33,10 @@ import {
   positionAt,
   pathTo,
 } from '../chess/tree';
-import { Board } from '../board/Board';
+import { ModeBoard } from './ModeBoard';
+import { BoardTools } from '../board/BoardTools';
+import { BoardNavigation } from '../board/BoardNavigation';
+import type { WorkspaceMode } from './WorkspaceApp';
 import { outcomeAt } from '../chess/outcome';
 import { useStableEngineMove } from '../board/use-stable-engine-move';
 import { samplePgn } from './sample';
@@ -102,9 +93,11 @@ interface Demo {
 export default function App({
   onWorkspaceChange,
   initialStudy,
+  navigationRef,
 }: {
   onWorkspaceChange?: (mode: 'review' | 'teacher' | 'play') => void;
   initialStudy?: Study;
+  navigationRef?: MutableRefObject<((next: WorkspaceMode) => Promise<void>) | null>;
 } = {}) {
   const [study, setStudy] = useState<Study>(() => {
     if (initialStudy) return initialStudy;
@@ -777,6 +770,13 @@ export default function App({
       setError(`Could not save before switching: ${errorMessage(error)}`);
     }
   };
+  useEffect(() => {
+    if (!navigationRef) return;
+    navigationRef.current = switchWorkspace;
+    return () => {
+      navigationRef.current = null;
+    };
+  });
   const engineDownloadDetails = engineLoad.phase !== 'ready' && (engineOn || reviewing) && (
     <div className={`engine-loader ${engineLoad.phase}`} role="status" aria-live="polite">
       <div className="engine-loader-title">
@@ -937,48 +937,6 @@ export default function App({
   );
   return (
     <div className="app-shell compact-review">
-      <aside className="sidebar">
-        <a className="brand-mark" href="#" aria-label="Chess Room home">
-          <img src={assetUrl('assets/icon.svg')} alt="" />
-        </a>
-        <div className="nav-items">
-          <button
-            className="nav-item selected"
-            title="Game review"
-            aria-label="Game review"
-            onClick={() => setTab('review')}
-          >
-            <ChartNoAxesCombined size={23} />
-            <span>Review</span>
-          </button>
-          <button className="nav-item" title="Analysis" onClick={() => setTab('analysis')}>
-            <MousePointer2 size={22} />
-            <span>Analyze</span>
-          </button>
-          <button className="nav-item" title="Openings" onClick={() => setTab('openings')}>
-            <BookOpen size={22} />
-            <span>Openings</span>
-          </button>
-          <button
-            className="nav-item"
-            title="Saved games"
-            onClick={() => {
-              void listStudies().then(setLibrary);
-              setModal('library');
-            }}
-          >
-            <FolderOpen size={22} />
-            <span>Library</span>
-          </button>
-        </div>
-        <div className="sidebar-bottom">
-          <button className="nav-item" title="Settings" onClick={() => openSettings()}>
-            <Settings2 size={21} />
-            <span>Settings</span>
-          </button>
-          <div className="local-avatar">YOU</div>
-        </div>
-      </aside>
       <main>
         <header className="page-header">
           <div>
@@ -990,17 +948,6 @@ export default function App({
             </h1>
           </div>
           <div className="header-actions">
-            <select
-              aria-label="Workspace"
-              value="review"
-              onChange={(event) =>
-                void switchWorkspace(event.target.value as 'review' | 'teacher' | 'play')
-              }
-            >
-              <option value="review">Game review</option>
-              <option value="teacher">Opening teacher</option>
-              <option value="play">Play Stockfish</option>
-            </select>
             <button
               className="import-button"
               onClick={() => {
@@ -1050,19 +997,10 @@ export default function App({
           </div>
         )}
         <div className="workspace">
-          <section className="board-column">
-            <div className="game-context">
-              <span>
-                <span className="live-dot" />
-                {study.headers.Event || 'Personal study'}
-              </span>
-              <span>
-                {study.headers.Site || 'Local game'}
-                {study.headers.Date ? ' · ' + study.headers.Date.slice(0, 4) : ''}
-              </span>
-            </div>
-            {player(top)}
-            <div className="board-with-eval">
+          <ModeBoard
+            top={player(top)}
+            bottom={player(bottom)}
+            evaluation={
               <div
                 className="evaluation-bar"
                 aria-label={hideHints ? 'Evaluation hidden' : `Evaluation ${scoreText(evalScore)}`}
@@ -1078,95 +1016,44 @@ export default function App({
                   {hideHints ? '?' : scoreText(evalScore)}
                 </span>
               </div>
-              <Board
-                fen={displayFen}
-                orientation={orientation}
-                lastMove={lastMove}
-                marks={demo || retry ? [] : study.nodes[study.selectedId].marks}
-                engineMarks={engineMarks}
-                coachMarks={coachMarks}
-                onMove={onMove}
-                onToggleMark={(m) => {
-                  if (!demo && !retry) setStudy((s) => toggleMark(s, s.selectedId, m));
-                }}
-                drawingMode={mode}
-                drawingColor={drawingColor}
-                disabled={retryBusy || Boolean(demo)}
-                badge={showBadge && !demo && !retry ? selectedAssessment?.primary : undefined}
-                hideHints={hideHints}
-                isSideline={isSideline}
-                outcome={outcome}
+            }
+            board={{
+              fen: displayFen,
+              orientation,
+              lastMove,
+              marks: demo || retry ? [] : study.nodes[study.selectedId].marks,
+              engineMarks,
+              coachMarks,
+              onMove,
+              onToggleMark: (m) => {
+                if (!demo && !retry) setStudy((s) => toggleMark(s, s.selectedId, m));
+              },
+              drawingMode: mode,
+              drawingColor,
+              disabled: retryBusy || Boolean(demo),
+              badge: showBadge && !demo && !retry ? selectedAssessment?.primary : undefined,
+              hideHints,
+              isSideline,
+              outcome,
+            }}
+            tools={
+              <BoardTools
+                mode={mode}
+                color={drawingColor}
+                onMode={setMode}
+                onColor={setDrawingColor}
+                onClear={clearMarks}
+                onFlip={() => setOrientation((c) => (c === 'w' ? 'b' : 'w'))}
+                onSettings={() => openSettings()}
               />
-            </div>
-            {player(bottom)}
-            <div className="board-controls">
-              <div className="annotation-tools">
-                <button
-                  title="Move pieces"
-                  aria-label="Move pieces"
-                  className={mode === 'move' ? 'active' : ''}
-                  onClick={() => setMode('move')}
-                >
-                  <MousePointer2 size={18} />
-                </button>
-                <button
-                  title="Draw arrows"
-                  aria-label="Draw arrows"
-                  className={mode === 'arrow' ? 'active' : ''}
-                  onClick={() => setMode('arrow')}
-                >
-                  <ArrowUpRight size={21} />
-                </button>
-                <button
-                  title="Highlight squares"
-                  aria-label="Highlight squares"
-                  className={mode === 'square' ? 'active' : ''}
-                  onClick={() => setMode('square')}
-                >
-                  <Square size={17} />
-                </button>
-                <div className="tool-divider" />
-                {(['red', 'orange', 'green', 'blue'] as DrawingColor[]).map((c) => (
-                  <button
-                    className={`color-dot ${c} ${drawingColor === c ? 'chosen' : ''}`}
-                    key={c}
-                    aria-label={`${c} annotations`}
-                    onClick={() => setDrawingColor(c)}
-                  />
-                ))}
-                <button
-                  title="Clear annotations"
-                  aria-label="Clear annotations"
-                  onClick={clearMarks}
-                >
-                  <Eraser size={18} />
-                </button>
-              </div>
-              <div className="board-utility">
-                <button
-                  title="Flip board (X)"
-                  aria-label="Flip board"
-                  aria-keyshortcuts="X"
-                  onClick={() => setOrientation((c) => (c === 'w' ? 'b' : 'w'))}
-                >
-                  <ArrowDownUp size={18} />
-                </button>
-                <button
-                  title="Board settings"
-                  aria-label="Board settings"
-                  onClick={() => openSettings()}
-                >
-                  <Settings2 size={18} />
-                </button>
-              </div>
-            </div>
-            <div className="board-caption">
-              <span>Right-click / drag: red · Ctrl: orange · Shift: green</span>
-              <span>
+            }
+            caption={
+              <>
                 <Check size={12} />
                 {saved}
-              </span>
-            </div>
+              </>
+            }
+          >
             {demo && (
               <div className="exploration-banner">
                 <div>
@@ -1198,7 +1085,7 @@ export default function App({
                 </button>
               </div>
             )}
-          </section>
+          </ModeBoard>
           <section className="analysis-column">
             <div className="review-topline">
               <span>
@@ -1377,17 +1264,18 @@ export default function App({
                 />
               )}
             </div>
-            <div className="transport">
-              <button
-                aria-label="Go to start"
-                onClick={() => (demo ? setDemo({ ...demo, index: 0 }) : navigate(study.rootId))}
-                disabled={Boolean(retry)}
-              >
-                <ChevronsLeft size={23} />
-              </button>
-              <button aria-label="Previous move" onClick={() => step(-1)} disabled={Boolean(retry)}>
-                <ChevronLeft size={25} />
-              </button>
+            <BoardNavigation
+              onStart={() => (demo ? setDemo({ ...demo, index: 0 }) : navigate(study.rootId))}
+              onPrevious={() => step(-1)}
+              onNext={() => step(1)}
+              onEnd={() =>
+                demo
+                  ? setDemo({ ...demo, index: demo.line.length })
+                  : navigate(study.mainline.at(-1) || study.rootId)
+              }
+              canPrevious={!retry}
+              canNext={!retry}
+            >
               <button
                 aria-label={autoplay ? 'Pause playback' : 'Play moves'}
                 className="play-button"
@@ -1396,21 +1284,7 @@ export default function App({
               >
                 {autoplay ? <Pause size={21} /> : <Play size={21} fill="currentColor" />}
               </button>
-              <button aria-label="Next move" onClick={() => step(1)} disabled={Boolean(retry)}>
-                <ChevronRight size={25} />
-              </button>
-              <button
-                aria-label="Go to end"
-                onClick={() =>
-                  demo
-                    ? setDemo({ ...demo, index: demo.line.length })
-                    : navigate(study.mainline.at(-1) || study.rootId)
-                }
-                disabled={Boolean(retry)}
-              >
-                <ChevronsRight size={23} />
-              </button>
-            </div>
+            </BoardNavigation>
           </section>
         </div>
         <footer className="page-footer">

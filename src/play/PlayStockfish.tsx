@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
-  ArrowLeft,
-  ArrowDownUp,
   Bot,
   Check,
   ChevronRight,
@@ -13,22 +11,29 @@ import {
   User,
   X,
 } from 'lucide-react';
-import { Board } from '../board/Board';
+import { BoardTools } from '../board/BoardTools';
+import { BoardNavigation } from '../board/BoardNavigation';
+import { ModeBoard } from '../app/ModeBoard';
+import { MoveList } from '../review/MoveList';
 import { chessAt, positionAt, createStudy } from '../chess/tree';
 import { outcomeAt } from '../chess/outcome';
-import type { Color, Study } from '../chess/types';
+import type { Color, DrawingColor, Mark, Study } from '../chess/types';
 import type { EngineLoadState } from '../engine/prepare-worker';
 import { GameOutcomeBadge } from '../ui/GameOutcomeBadge';
 import { PlayEngine } from './engine';
 import {
   advanceGame,
+  annotateGame,
   createGame,
   defaultSettings,
+  navigateHistory,
   resignGame,
   restoreSession,
   serializeSession,
+  snapshotForReview,
   strengthFor,
   strengths,
+  viewedStudy,
   type PlaySession,
   type PlaySettings,
 } from './game';
@@ -81,10 +86,9 @@ function PlayDialog({
 }
 
 export function PlayStockfish({
-  onBack,
   onReview,
 }: {
-  onBack: () => void;
+  onBack?: () => void;
   onReview?: (study: Study) => void;
 }) {
   const [session, setSession] = useState(initialSession);
@@ -92,7 +96,8 @@ export function PlayStockfish({
   const [setup, setSetup] = useState(!session.game);
   const [draft, setDraft] = useState<PlaySettings>(session.settings);
   const [confirmResign, setConfirmResign] = useState(false);
-  const [showMoves, setShowMoves] = useState(false);
+  const [drawingMode, setDrawingMode] = useState<'move' | 'arrow' | 'square'>('move');
+  const [drawingColor, setDrawingColor] = useState<DrawingColor>('green');
   const [storageError, setStorageError] = useState('');
   const [load, setLoad] = useState<EngineLoadState>({ phase: 'checking', loaded: 0, total: 0 });
   const [engineError, setEngineError] = useState('');
@@ -103,6 +108,18 @@ export function PlayStockfish({
   const game = session.game;
   const empty = useMemo(() => createStudy(), []);
   const study = game?.study || empty;
+  const displayStudy = useMemo(
+    () => (game ? viewedStudy(game, session.viewPly) : empty),
+    [game, session.viewPly, empty],
+  );
+  const displayNode = displayStudy.nodes[displayStudy.selectedId];
+  const displayPly = session.viewPly ?? study.mainline.length;
+  const viewingHistory = displayStudy.selectedId !== study.selectedId;
+  const displayOutcome = useMemo(() => outcomeAt(displayStudy), [displayStudy]);
+  const displayChess = useMemo(
+    () => chessAt(displayStudy, displayStudy.selectedId),
+    [displayStudy],
+  );
   const chess = useMemo(() => chessAt(study, study.selectedId), [study]);
   const outcome = useMemo(() => outcomeAt(study), [study]);
   const ended = Boolean(outcome);
@@ -183,30 +200,49 @@ export function PlayStockfish({
 
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
+      const flip = event.key.toLowerCase() === 'x';
       if (
-        event.key.toLowerCase() !== 'x' ||
+        (!flip && event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') ||
         event.ctrlKey ||
         event.metaKey ||
         event.altKey ||
-        event.repeat ||
+        (flip && event.repeat) ||
         setup ||
         confirmResign ||
-        showMoves ||
         (event.target as HTMLElement)?.closest('input,textarea,select,[contenteditable="true"]')
       )
         return;
       event.preventDefault();
       const latest = current.current;
-      commit({ ...latest, orientation: latest.orientation === 'w' ? 'b' : 'w' });
+      if (flip) commit({ ...latest, orientation: latest.orientation === 'w' ? 'b' : 'w' });
+      else commit(navigateHistory(latest, event.key === 'ArrowLeft' ? 'previous' : 'next'));
     };
     window.addEventListener('keydown', keydown);
     return () => window.removeEventListener('keydown', keydown);
-  }, [setup, confirmResign, showMoves]);
+  }, [setup, confirmResign]);
+
+  const navigate = (target: Parameters<typeof navigateHistory>[1]) =>
+    commit(navigateHistory(current.current, target));
+  const selectHistory = (id: string) => {
+    const currentStudy = current.current.game?.study;
+    if (!currentStudy) return;
+    const ply = id === currentStudy.rootId ? 0 : currentStudy.mainline.indexOf(id) + 1;
+    if (id === currentStudy.rootId || ply > 0) navigate(ply);
+  };
+  const annotate = (mark?: Mark) => {
+    const latest = current.current;
+    if (!latest.game) return;
+    commit({
+      ...latest,
+      game: annotateGame(latest.game, latest.viewPly ?? latest.game.study.mainline.length, mark),
+    });
+  };
 
   const move = (uci: string) => {
     const latest = current.current;
     if (
       !latest.game ||
+      (latest.viewPly != null && latest.viewPly < latest.game.study.mainline.length) ||
       !ready ||
       engineError ||
       latest.game.study.headers.Result !== '*' ||
@@ -222,19 +258,16 @@ export function PlayStockfish({
   const start = () => {
     engine.current?.dispose();
     const next = createGame(draft);
-    commit({ game: next, settings: draft, orientation: next.humanColor });
+    commit({ game: next, settings: draft, orientation: next.humanColor, viewPly: null });
+    setDrawingMode('move');
     setReady(false);
     setSetup(false);
-  };
-  const leave = () => {
-    engine.current?.dispose();
-    onBack();
   };
   const flip = () => {
     const latest = current.current;
     commit({ ...latest, orientation: latest.orientation === 'w' ? 'b' : 'w' });
   };
-  const title = !game
+  const liveTitle = !game
     ? 'Ready when you are'
     : outcome
       ? outcome.kind === 'draw'
@@ -251,19 +284,17 @@ export function PlayStockfish({
           : thinking || chess.turn() !== human
             ? 'Stockfish is thinking…'
             : 'Your move';
-  const subtitle = outcome
-    ? study.headers.Termination || 'Game complete'
-    : game
-      ? chess.isCheck()
-        ? 'Check — protect your king'
-        : `${human === 'w' ? 'White' : 'Black'} · No clock · ${selectedStrength.label}`
-      : 'Choose a strength and your side.';
+  const title = viewingHistory ? 'Viewing game history' : liveTitle;
+  const subtitle = viewingHistory
+    ? `Move ${displayPly} of ${study.mainline.length} · ${liveTitle}`
+    : outcome
+      ? study.headers.Termination || 'Game complete'
+      : game
+        ? chess.isCheck()
+          ? 'Check — protect your king'
+          : `${human === 'w' ? 'White' : 'Black'} · No clock · ${selectedStrength.label}`
+        : 'Choose a strength and your side.';
   const progress = load.total ? Math.min(100, Math.round((load.loaded / load.total) * 100)) : 0;
-  const movePairs = Array.from({ length: Math.ceil(study.mainline.length / 2) }, (_, i) => ({
-    number: i + 1,
-    white: study.nodes[study.mainline[i * 2]]?.san,
-    black: study.nodes[study.mainline[i * 2 + 1]]?.san,
-  }));
   const player = (color: Color) => (
     <div className="play-player">
       <span className={`play-avatar ${color === 'w' ? 'is-white' : 'is-black'}`}>
@@ -279,32 +310,16 @@ export function PlayStockfish({
             : selectedStrength.label}
         </small>
       </span>
-      {outcome && <GameOutcomeBadge outcome={outcome} color={color} />}
-      {game && !ended && chess.turn() === color && (
+      {displayOutcome && <GameOutcomeBadge outcome={displayOutcome} color={color} />}
+      {game && !displayOutcome && displayChess.turn() === color && (
         <span className="play-turn-dot" aria-label="Side to move" />
       )}
-    </div>
-  );
-  const renderMoves = (all: boolean) => (
-    <div className="play-moves" aria-label="Game moves">
-      {(all ? movePairs : movePairs.slice(-5)).map((pair) => (
-        <div className="play-move-pair" key={pair.number}>
-          <span>{pair.number}.</span>
-          <strong>{pair.white}</strong>
-          <strong>{pair.black || '…'}</strong>
-        </div>
-      ))}
-      {!movePairs.length && <p>Your moves will appear here.</p>}
     </div>
   );
 
   return (
     <main className="play-stockfish" data-orientation={session.orientation}>
       <header className="play-header">
-        <button onClick={leave} className="play-back" aria-label="Back to review">
-          <ArrowLeft size={19} />
-          <span>Review</span>
-        </button>
         <h1>
           <Bot size={22} /> Play Stockfish
         </h1>
@@ -313,25 +328,46 @@ export function PlayStockfish({
         </span>
       </header>
       <div className="play-layout">
-        <section className="play-board-area" aria-label="Play chess">
-          <div className="play-board-stack">
-            {player(session.orientation === 'w' ? 'b' : 'w')}
-            <Board
-              key={study.id}
-              fen={study.nodes[study.selectedId].fen}
-              orientation={session.orientation}
-              lastMove={study.nodes[study.selectedId].uci}
-              marks={[]}
-              drawingMode="move"
-              drawingColor="green"
-              onMove={move}
-              onToggleMark={() => {}}
-              disabled={!game || !ready || ended || Boolean(engineError) || chess.turn() !== human}
-              outcome={outcome}
+        <ModeBoard
+          key={study.id}
+          board={{
+            fen: displayNode.fen,
+            orientation: session.orientation,
+            lastMove: displayNode.uci,
+            marks: displayNode.marks,
+            drawingMode,
+            drawingColor,
+            onMove: move,
+            onToggleMark: annotate,
+            disabled:
+              viewingHistory ||
+              !game ||
+              !ready ||
+              ended ||
+              Boolean(engineError) ||
+              chess.turn() !== human,
+            outcome: displayOutcome,
+          }}
+          top={player(session.orientation === 'w' ? 'b' : 'w')}
+          bottom={player(session.orientation)}
+          tools={
+            <BoardTools
+              mode={drawingMode}
+              color={drawingColor}
+              onMode={setDrawingMode}
+              onColor={setDrawingColor}
+              onClear={() => annotate()}
+              onFlip={flip}
             />
-            {player(session.orientation)}
-          </div>
-        </section>
+          }
+          caption={
+            <span className="play-position-caption">
+              {viewingHistory
+                ? `History · half-move ${displayPly} of ${study.mainline.length}`
+                : `Live game · ${study.mainline.length} half-moves`}
+            </span>
+          }
+        />
         <aside className="play-panel">
           <div className="play-status" role="status" aria-live="polite">
             <div className="play-status-icon">
@@ -376,21 +412,23 @@ export function PlayStockfish({
           <div className="play-moves-section">
             <div className="play-section-heading">
               <h3>Moves</h3>
-              {movePairs.length > 5 && (
-                <button onClick={() => setShowMoves(true)}>
-                  All moves <ChevronRight size={13} />
-                </button>
-              )}
             </div>
-            {renderMoves(false)}
+            <div className="play-moves" aria-label="Game moves">
+              <MoveList study={displayStudy} assessments={{}} onSelect={selectHistory} />
+            </div>
           </div>
           <div className="play-actions">
+            {viewingHistory && (
+              <button className="play-primary play-return-live" onClick={() => navigate('end')}>
+                Return to live game <ChevronRight size={17} />
+              </button>
+            )}
             {ended && onReview && (
               <button
                 className="play-primary"
                 onClick={() => {
                   engine.current?.dispose();
-                  onReview(study);
+                  onReview(snapshotForReview(study));
                 }}
               >
                 Review this game <ChevronRight size={17} />
@@ -406,19 +444,28 @@ export function PlayStockfish({
               <Plus size={17} /> New game
             </button>
             <div className="play-secondary-actions">
-              <button onClick={flip} title="Flip board (X)">
-                <ArrowDownUp size={16} /> Flip <kbd>X</kbd>
-              </button>
               <button onClick={() => setConfirmResign(true)} disabled={!game || ended}>
                 <Flag size={15} /> Resign
               </button>
             </div>
           </div>
           <p className="play-footnote">Casual play. No clock, no rating changes.</p>
+          <BoardNavigation
+            onStart={() => navigate('start')}
+            onPrevious={() => navigate('previous')}
+            onNext={() => navigate('next')}
+            onEnd={() => navigate('end')}
+            canPrevious={displayPly > 0}
+            canNext={viewingHistory}
+          >
+            <span>
+              {displayPly} / {study.mainline.length}
+            </span>
+          </BoardNavigation>
         </aside>
       </div>
       {setup && (
-        <PlayDialog title="New game" onClose={() => (game ? setSetup(false) : leave())}>
+        <PlayDialog title="New game" onClose={() => setSetup(false)}>
           <p className="play-dialog-intro">
             Your next opponent is ready. Make it a fair fight or a serious challenge.
           </p>
@@ -493,11 +540,6 @@ export function PlayStockfish({
           <button className="play-secondary" onClick={() => setConfirmResign(false)}>
             Keep playing
           </button>
-        </PlayDialog>
-      )}
-      {showMoves && (
-        <PlayDialog title="Game moves" onClose={() => setShowMoves(false)}>
-          {renderMoves(true)}
         </PlayDialog>
       )}
     </main>

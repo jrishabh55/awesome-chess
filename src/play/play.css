@@ -148,7 +148,51 @@
   border: 1px solid #3a3e34;
   background: #272a24;
   border-radius: 9px;
-  padding: 6px 0;
+  padding: 0;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.play-moves-section {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 96px;
+}
+.play-moves > .move-list {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
+.play-moves .starting-position {
+  height: 28px;
+  min-height: 28px;
+  flex: none;
+  padding: 3px 10px;
+  margin: 0;
+  line-height: 22px;
+}
+.play-moves .move-row {
+  height: 32px;
+  min-height: 32px;
+  padding: 0 8px;
+  grid-template-columns: 30px 1fr 1fr;
+}
+.play-moves .move-cell {
+  height: 32px;
+  min-height: 32px;
+  padding: 3px 7px;
+}
+.play-position-caption {
+  font-size: 10px;
+}
+.play-panel > .transport {
+  flex: none;
 }
 .play-move-pair {
   display: grid;

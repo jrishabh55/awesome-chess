@@ -1,16 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import {
-  ArrowLeft,
-  ArrowRight,
-  BookOpen,
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  RotateCcw,
-  X,
-} from 'lucide-react';
-import { Board } from '../board/Board';
-import type { Color, Mark, Square } from '../chess/types';
+import { ArrowRight, BookOpen, Check, ChevronLeft, ChevronRight, RotateCcw, X } from 'lucide-react';
+import { ModeBoard } from '../app/ModeBoard';
+import { BoardTools, type DrawingMode } from '../board/BoardTools';
+import { BoardNavigation } from '../board/BoardNavigation';
+import { OpeningDatabasePicker } from './OpeningDatabasePicker';
+import type { Color, DrawingColor, Mark, Square } from '../chess/types';
 import { builtInPacks, importPack, type OpeningPack } from './packs';
 import {
   createSession,
@@ -36,13 +30,17 @@ function readSaved(): Progress | null {
 }
 const colorName = (side: Color) => (side === 'w' ? 'White' : 'Black');
 
-export function OpeningTeacher({ onBack }: { onBack: () => void }) {
+export function OpeningTeacher(_props: { onBack?: () => void } = {}) {
   const [saved] = useState(readSaved);
   const [pack, setPack] = useState<OpeningPack>(saved?.pack || builtInPacks[0]);
   const [session, setSession] = useState<TrainingSession>(
     () => saved?.session || createSession(builtInPacks[0]),
   );
   const [active, setActive] = useState(false);
+  const [orientation, setOrientation] = useState<Color>(saved?.pack.side || 'w');
+  const [drawingMode, setDrawingMode] = useState<DrawingMode>('move');
+  const [drawingColor, setDrawingColor] = useState<DrawingColor>('red');
+  const [annotations, setAnnotations] = useState<Record<string, Mark[]>>({});
   const [dialog, setDialog] = useState<'catalog' | 'reset' | 'note' | null>(null);
   const [catalogIndex, setCatalogIndex] = useState(0);
   const [pgn, setPgn] = useState('');
@@ -67,6 +65,49 @@ export function OpeningTeacher({ onBack }: { onBack: () => void }) {
     .slice(0, session.stage)
     .filter((s) => s.kind === 'final').length;
   const catalogPack = builtInPacks[catalogIndex];
+  const fen = position(pack, session);
+  const annotationKey = fen.split(' ').slice(0, 4).join(' ');
+  const flip = () => setOrientation((value) => (value === 'w' ? 'b' : 'w'));
+  function toggleAnnotation(mark: Mark) {
+    const key = (value: Mark) =>
+      value.kind === 'arrow'
+        ? `${value.kind}:${value.color}:${value.from}:${value.to}`
+        : `${value.kind}:${value.color}:${value.square}`;
+    setAnnotations((current) => {
+      const existing = current[annotationKey] || [];
+      return {
+        ...current,
+        [annotationKey]: existing.some((value) => key(value) === key(mark))
+          ? existing.filter((value) => key(value) !== key(mark))
+          : [...existing, mark],
+      };
+    });
+  }
+  useEffect(() => {
+    const keydown = (event: KeyboardEvent) => {
+      if (
+        dialog ||
+        event.isComposing ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.altKey ||
+        (event.target instanceof Element &&
+          event.target.closest('input,textarea,select,[contenteditable="true"]'))
+      )
+        return;
+      if (event.key.toLowerCase() === 'x') {
+        if (event.repeat) return;
+        event.preventDefault();
+        flip();
+        return;
+      }
+      if (!active || !guided || !['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+      event.preventDefault();
+      setSession((current) => guideStep(pack, current, event.key === 'ArrowLeft' ? -1 : 1));
+    };
+    window.addEventListener('keydown', keydown);
+    return () => window.removeEventListener('keydown', keydown);
+  }, [active, guided, dialog, pack]);
 
   useEffect(() => {
     if (!active) return;
@@ -101,6 +142,9 @@ export function OpeningTeacher({ onBack }: { onBack: () => void }) {
       }
     }
     setPack(nextPack);
+    setOrientation(nextPack.side);
+    setAnnotations({});
+    setDrawingMode('move');
     setSession(nextSession);
     setActive(true);
     setDialog(null);
@@ -143,71 +187,72 @@ export function OpeningTeacher({ onBack }: { onBack: () => void }) {
   return (
     <section className="opening-teacher" aria-label="Opening Teacher">
       <header className="ot-header">
-        <button
-          className="ot-icon"
-          onClick={onBack}
-          aria-label="Back to analysis"
-          title="Back to analysis"
-        >
-          <ArrowLeft size={19} />
-        </button>
         <BookOpen size={21} className="ot-accent" />
         <div className="ot-heading">
           <h1>Opening Teacher</h1>
           <span>{active ? pack.name : 'Learn the plans. Remember the moves.'}</span>
         </div>
-        <button
-          className="ot-button"
-          onClick={() => {
-            setError('');
-            setDialog('catalog');
-          }}
-        >
-          Openings
-        </button>
-        {active && (
-          <button
-            className="ot-icon"
-            aria-label="Restart course"
-            title="Restart course"
-            onClick={() => setDialog('reset')}
-          >
-            <RotateCcw size={17} />
-          </button>
-        )}
       </header>
-      <div className="ot-course-progress" aria-label="Course progress">
-        <span>
-          {active
-            ? `${Math.min(learned, pack.lines.length)} / ${pack.lines.length} variations learned`
-            : 'Guided tour → practice → final drill'}
-        </span>
-        <progress
-          aria-label="Course stages completed"
-          value={active ? session.stage : 0}
-          max={session.stages.length}
-        />
-        {active && (
-          <span>{finished ? 'Complete' : `${session.stage + 1} / ${session.stages.length}`}</span>
-        )}
-      </div>
       <div className="ot-workspace">
-        <div className="ot-board-area">
-          <div className="ot-board-wrap">
-            <Board
-              fen={position(pack, session)}
-              orientation={pack.side}
-              lastMove={lastMove?.uci}
-              marks={marks}
-              onMove={play}
-              onToggleMark={() => {}}
-              drawingMode="move"
-              drawingColor="green"
-              disabled={!active || !!guided || lineFinished || finished || !!dialog}
+        <ModeBoard
+          board={{
+            fen,
+            orientation,
+            lastMove: lastMove?.uci,
+            marks: annotations[annotationKey] || [],
+            coachMarks: marks,
+            onMove: play,
+            onToggleMark: toggleAnnotation,
+            drawingMode,
+            drawingColor,
+            disabled: !active || !!guided || lineFinished || finished || !!dialog,
+          }}
+          tools={
+            <BoardTools
+              mode={drawingMode}
+              color={drawingColor}
+              onMode={setDrawingMode}
+              onColor={setDrawingColor}
+              onClear={() => setAnnotations((current) => ({ ...current, [annotationKey]: [] }))}
+              onFlip={flip}
             />
-          </div>
-        </div>
+          }
+          caption={active && guided ? '← / → Guided tour · X Flip' : 'X Flip board'}
+        />
         <aside className="ot-panel" aria-label="Opening lesson">
+          <div className="ot-panel-controls">
+            <button
+              className="ot-button"
+              onClick={() => {
+                setError('');
+                setDialog('catalog');
+              }}
+            >
+              Openings
+            </button>
+            <div className="ot-course-progress" aria-label="Course progress">
+              <span>
+                {active
+                  ? `${Math.min(learned, pack.lines.length)} / ${pack.lines.length} learned`
+                  : 'Tour → practice'}
+              </span>
+              <progress
+                aria-label="Course stages completed"
+                value={active ? session.stage : 0}
+                max={session.stages.length}
+              />
+            </div>
+            {active && (
+              <button
+                className="ot-icon"
+                aria-label="Restart course"
+                title="Restart course"
+                onClick={() => setDialog('reset')}
+              >
+                <RotateCcw size={16} />
+              </button>
+            )}
+          </div>
           {!active ? (
             <>
               <div className="ot-eyebrow">
@@ -325,25 +370,22 @@ export function OpeningTeacher({ onBack }: { onBack: () => void }) {
               )}
               <div className="ot-actions">
                 {guided ? (
-                  <div className="ot-navigation">
-                    <button
-                      className="ot-button"
-                      disabled={session.ply === 0}
-                      onClick={() => setSession(guideStep(pack, session, -1))}
-                    >
-                      <ChevronLeft size={16} />
-                      Back
-                    </button>
-                    <button
-                      className="ot-primary"
-                      onClick={() =>
-                        lineFinished ? advance() : setSession(guideStep(pack, session, 1))
-                      }
-                    >
-                      {lineFinished ? 'Start practice' : 'Next move'}
-                      <ChevronRight size={16} />
-                    </button>
-                  </div>
+                  <>
+                    <BoardNavigation
+                      onStart={() => setSession(guideStep(pack, session, -session.ply))}
+                      onPrevious={() => setSession(guideStep(pack, session, -1))}
+                      onNext={() => setSession(guideStep(pack, session, 1))}
+                      onEnd={() => setSession(guideStep(pack, session, line.moves.length))}
+                      canPrevious={session.ply > 0}
+                      canNext={!lineFinished}
+                    />
+                    {lineFinished && (
+                      <button className="ot-primary" onClick={advance}>
+                        Start practice
+                        <ChevronRight size={16} />
+                      </button>
+                    )}
+                  </>
                 ) : lineFinished ? (
                   <button className="ot-primary" onClick={advance}>
                     {continueLabel}
@@ -431,6 +473,9 @@ export function OpeningTeacher({ onBack }: { onBack: () => void }) {
           </div>
         ) : (
           <div className="ot-dialog-content">
+            {dialog === 'catalog' && (
+              <OpeningDatabasePicker onChoose={(nextPack) => start(nextPack, true)} />
+            )}
             <p className="ot-muted">
               One guided tour and one drill for your first line. Each new line adds a tour and two
               shuffled drills, including that new line. Finish by recalling every variation in

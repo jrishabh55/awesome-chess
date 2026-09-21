@@ -1,0 +1,500 @@
+/* One frame for review, lessons and games. Only the right-hand controls change. */
+.workspace-app {
+  --rail-width: 72px;
+  --controls-width: clamp(300px, 27vw, 360px);
+  display: grid;
+  grid-template-columns: var(--rail-width) minmax(0, 1fr);
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+  background: #20221f;
+}
+.mode-sidebar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 14px 6px;
+  background: #191c17;
+  border-right: 1px solid #33372d;
+  min-height: 0;
+}
+.mode-brand img {
+  width: 40px;
+  height: 40px;
+}
+.mode-sidebar nav {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 8px;
+  margin-top: 28px;
+}
+.mode-sidebar nav button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 2px;
+  color: #a6ac9e;
+  border-radius: 8px;
+  font-size: 10px;
+}
+.mode-sidebar nav button:hover {
+  background: #2b3126;
+  color: #e1e7d8;
+}
+.mode-sidebar nav button.selected {
+  background: #35442b;
+  color: #c5e59d;
+}
+.mode-local {
+  margin-top: auto;
+  font-size: 8px;
+  letter-spacing: 1.4px;
+  color: #747e68;
+}
+.workspace-content {
+  min-height: 0;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+}
+.workspace-app .compact-review {
+  height: 100%;
+  min-height: 0;
+}
+.workspace-app :is(.compact-review > main, .opening-teacher, .play-stockfish) {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: transparent;
+  overflow: hidden;
+}
+.workspace-app :is(.page-header, .ot-header, .play-header) {
+  flex: 0 0 42px;
+  height: 42px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.workspace-app :is(.page-header, .ot-header, .play-header) h1 {
+  font-size: 20px;
+  line-height: 1.25;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.workspace-app :is(.workspace, .ot-workspace, .play-layout) {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--controls-width);
+  grid-template-rows: minmax(0, 1fr);
+  align-items: stretch;
+  gap: 18px;
+}
+.workspace-app .shared-board-column {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.workspace-app .board-with-eval {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  container-type: size;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.workspace-app .board-frame {
+  width: min(calc(100cqw - 24px), 100cqh);
+  flex: none;
+}
+.workspace-app .evaluation-bar {
+  width: 16px;
+  height: min(calc(100cqw - 24px), 100cqh);
+}
+.board-eval-spacer {
+  width: 16px;
+  flex: none;
+}
+.workspace-app :is(.player-row, .play-player) {
+  flex: 0 0 38px;
+  min-height: 0;
+  height: 38px;
+  padding: 3px 0 3px 22px;
+  gap: 8px;
+}
+.workspace-app .board-controls {
+  flex: none;
+  margin: 4px 0 0 22px;
+  padding: 2px 5px;
+  min-height: 38px;
+}
+.workspace-app .board-controls button {
+  flex-shrink: 0;
+}
+.workspace-app .annotation-tools {
+  min-width: 0;
+}
+.workspace-app .annotation-tools > button.color-dot {
+  width: 14px;
+  height: 14px;
+  min-height: 14px;
+  min-width: 14px;
+  padding: 0;
+  flex: none;
+  border-radius: 50%;
+}
+.workspace-app .board-caption {
+  flex: 0 0 16px;
+  min-height: 0;
+  margin: 2px 0 0;
+  display: flex;
+  justify-content: flex-end;
+  font-size: 9px;
+}
+.workspace-app .board-caption > span:first-child {
+  display: none;
+}
+.workspace-app :is(.analysis-column, .ot-panel, .play-panel) {
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  max-height: none;
+  overflow: hidden;
+  border: 1px solid #3d4035;
+  border-radius: 10px;
+  background: #272923;
+  display: flex;
+  flex-direction: column;
+}
+.workspace-app .review-topline {
+  border-radius: 0;
+}
+.workspace-app .review-topline small {
+  max-width: 160px;
+}
+.workspace-app :is(.ot-panel, .play-panel) {
+  padding: 14px;
+  gap: 12px;
+}
+.workspace-app .ot-panel h2 {
+  font-size: 21px;
+}
+.workspace-app .ot-panel .ot-course-progress {
+  padding: 0;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.workspace-app .ot-panel .ot-course-progress progress {
+  min-width: 80px;
+}
+.workspace-app .ot-panel .ot-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.workspace-app .transport {
+  flex: none;
+  display: flex;
+  height: 47px;
+  gap: 6px;
+  padding: 6px 12px;
+}
+.workspace-app .transport button {
+  height: 33px;
+  flex: 1;
+  display: grid;
+  place-items: center;
+}
+.workspace-app .transport button svg {
+  width: 20px;
+}
+.workspace-app :is(.ot-panel, .play-panel) > .transport {
+  margin: 0 -14px -14px;
+}
+.workspace-app .play-status-icon {
+  display: none;
+}
+.workspace-app .play-status h2 {
+  font-size: 20px;
+}
+.workspace-app .play-status p {
+  margin-top: 5px;
+}
+.workspace-app .play-moves-section {
+  flex: 1;
+  min-height: 90px;
+  display: flex;
+  flex-direction: column;
+}
+.workspace-app .play-moves-section > .move-list {
+  flex: 1;
+  min-height: 90px;
+}
+.workspace-app .play-actions {
+  flex: none;
+}
+.workspace-app .play-local {
+  font-size: 10px;
+}
+.workspace-app .play-panel .play-small-note {
+  margin: 0;
+}
+@media (max-width: 1100px) and (min-width: 901px) {
+  .workspace-app {
+    --controls-width: 310px;
+  }
+  .workspace-app :is(.workspace, .ot-workspace, .play-layout) {
+    gap: 12px;
+  }
+}
+@media (max-width: 900px) {
+  .workspace-app {
+    --rail-width: 52px;
+  }
+  .mode-sidebar {
+    padding: 10px 4px;
+  }
+  .mode-brand img {
+    width: 32px;
+    height: 32px;
+  }
+  .mode-sidebar nav {
+    margin-top: 18px;
+    gap: 6px;
+  }
+  .mode-sidebar nav button {
+    padding: 9px 1px;
+    font-size: 9px;
+  }
+  .mode-sidebar nav button svg {
+    width: 21px;
+    height: 21px;
+  }
+  .mode-local {
+    font-size: 7px;
+    letter-spacing: 0.7px;
+  }
+  .workspace-app :is(.compact-review > main, .opening-teacher, .play-stockfish) {
+    padding: 8px;
+    gap: 6px;
+  }
+  .workspace-app :is(.page-header, .ot-header, .play-header) {
+    flex-basis: 36px;
+    height: 36px;
+  }
+  .workspace-app :is(.page-header, .ot-header, .play-header) h1 {
+    display: flex;
+    font-size: 16px;
+  }
+  .workspace-app .header-actions {
+    width: auto;
+  }
+  .workspace-app :is(.workspace, .ot-workspace, .play-layout) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 45fr) minmax(0, 55fr);
+    gap: 6px;
+  }
+  .workspace-app :is(.player-row, .play-player) {
+    flex-basis: 27px;
+    height: 27px;
+    padding-top: 1px;
+    padding-bottom: 1px;
+  }
+  .workspace-app .play-avatar {
+    width: 24px;
+    height: 24px;
+  }
+  .workspace-app .play-player small {
+    display: none;
+  }
+  .workspace-app .board-controls {
+    min-height: 32px;
+    margin-top: 2px;
+    padding: 2px 3px;
+  }
+  .workspace-app .board-controls button {
+    min-height: 27px;
+    height: 27px;
+  }
+  .workspace-app .annotation-tools {
+    gap: 3px;
+  }
+  .workspace-app .board-controls .tool-divider {
+    margin: 0 2px;
+  }
+  .workspace-app .board-controls .board-utility {
+    gap: 2px;
+  }
+  .workspace-app .board-caption {
+    flex-basis: 12px;
+    font-size: 8px;
+  }
+  .workspace-app :is(.ot-panel, .play-panel) {
+    padding: 9px;
+    gap: 7px;
+  }
+  .workspace-app .ot-panel h2 {
+    font-size: 17px;
+  }
+  .workspace-app .ot-panel .ot-teaching-copy h3 {
+    font-size: 14px;
+    margin-bottom: 5px;
+  }
+  .workspace-app .ot-panel .ot-teaching-copy p {
+    font-size: 11px;
+    line-height: 1.4;
+    -webkit-line-clamp: 3;
+  }
+  .workspace-app .transport {
+    height: 37px;
+    padding: 3px 9px;
+  }
+  .workspace-app .transport button {
+    height: 29px;
+  }
+  .workspace-app :is(.ot-panel, .play-panel) > .transport {
+    margin: 0 -9px -9px;
+  }
+  .workspace-app .play-status h2 {
+    font-size: 16px;
+  }
+  .workspace-app .play-status p {
+    font-size: 11px;
+    margin-top: 3px;
+  }
+  .workspace-app .play-moves-section {
+    min-height: 74px;
+  }
+  .workspace-app .play-moves-section > .move-list {
+    min-height: 74px;
+  }
+  .workspace-app .play-section-heading {
+    margin-bottom: 3px;
+  }
+  .workspace-app .play-local {
+    display: none;
+  }
+}
+@media (max-width: 560px) {
+  .workspace-app .page-header h1 {
+    font-size: 14px;
+  }
+  .workspace-app .import-button {
+    font-size: 10px;
+    min-height: 30px;
+    padding: 5px 7px;
+  }
+  .workspace-app .import-button svg {
+    width: 14px;
+  }
+  .workspace-app .review-topline small {
+    max-width: 135px;
+  }
+  .workspace-app .board-controls .annotation-tools {
+    gap: 1px;
+  }
+  .workspace-app .board-controls button {
+    padding: 4px;
+  }
+}
+@media (max-height: 520px) and (min-width: 600px) {
+  .workspace-app {
+    --controls-width: 300px;
+  }
+  .workspace-app :is(.workspace, .ot-workspace, .play-layout) {
+    grid-template-columns: minmax(0, 1fr) var(--controls-width);
+    grid-template-rows: minmax(0, 1fr);
+  }
+  .workspace-app :is(.ot-panel, .play-panel) {
+    gap: 5px;
+  }
+  .workspace-app .ot-panel .ot-teaching-copy p {
+    -webkit-line-clamp: 2;
+  }
+}
+/* Keep game history and actions visible while the opponent is loading or thinking. */
+.workspace-app .play-panel {
+  align-items: stretch;
+  text-align: left;
+}
+.workspace-app .play-moves-section {
+  min-height: 108px;
+}
+.workspace-app .play-moves {
+  min-height: 92px;
+  flex: 1;
+}
+.workspace-app .play-moves > .move-list {
+  min-height: 90px;
+}
+.workspace-app .play-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  min-width: 0;
+}
+.workspace-app .play-actions > .play-primary:not(:has(.lucide-plus)) {
+  grid-column: 1 / -1;
+}
+.workspace-app .play-secondary-actions button {
+  min-height: 34px;
+}
+.workspace-app .play-download {
+  flex: none;
+  padding: 5px 8px;
+  font-size: 10px;
+}
+.workspace-app .play-download progress {
+  height: 3px;
+  margin: 4px 0 0;
+}
+.workspace-app .play-download small {
+  display: none;
+}
+.workspace-app .play-moves .padded {
+  font-size: 11px;
+  padding: 7px;
+}
+.workspace-app .play-panel > .transport > span {
+  align-self: center;
+  font-size: 11px;
+  color: #adb7a1;
+}
+@media (max-width: 900px) {
+  .workspace-app .play-moves-section {
+    min-height: 90px;
+  }
+  .workspace-app .play-moves {
+    min-height: 76px;
+  }
+  .workspace-app .play-moves > .move-list {
+    min-height: 74px;
+  }
+  .workspace-app .play-footnote {
+    display: none;
+  }
+  .workspace-app .play-secondary-actions button {
+    min-height: 29px;
+  }
+}

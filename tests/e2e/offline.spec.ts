@@ -53,6 +53,19 @@ test('PWA reloads and runs real Stockfish plus reviews with networking disabled'
   await expect(page.getByRole('button', { name: 'Review again', exact: true })).toBeVisible({
     timeout: 100000,
   });
+  await page
+    .getByRole('navigation', { name: 'Workspace' })
+    .getByRole('button', { name: 'Opening teacher', exact: true })
+    .click();
+  await page.getByRole('button', { name: 'Openings', exact: true }).click();
+  await page
+    .getByRole('searchbox', { name: 'Opening name, variation, or ECO' })
+    .fill('Sicilian Dragon');
+  const opening = page.locator('.ot-database-results button').first();
+  await expect(opening).toBeVisible();
+  await opening.click();
+  await page.getByRole('button', { name: 'Learn selected opening', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'White plays e4', exact: true })).toBeVisible();
 });
 test('failed engine download never reports offline readiness', async ({ page, context }) => {
   await page.goto('./');

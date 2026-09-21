@@ -1,5 +1,5 @@
-import type { Color, Study } from '../chess/types';
-import { chessAt, createStudy, playMove, positionAt } from '../chess/tree';
+import type { Color, Mark, Study } from '../chess/types';
+import { chessAt, createStudy, playMove, positionAt, toggleMark } from '../chess/tree';
 import type { Strength } from './engine';
 
 // Stockfish documents Elo 1320–3190 and Skill Level 0–20. Its calibration
@@ -52,6 +52,8 @@ export interface PlaySession {
   game: PlayGame | null;
   settings: PlaySettings;
   orientation: Color;
+  /** Null follows the live game; a ply number pins an already played position. */
+  viewPly?: number | null;
 }
 export const defaultSettings: PlaySettings = { side: 'w', strengthId: 'skill-0' };
 export const strengthFor = (id: string) => strengths.find((s) => s.id === id) || strengths[0];
@@ -111,20 +113,80 @@ export function resignGame(game: PlayGame): PlayGame {
   };
 }
 
+export function viewedStudy(game: PlayGame, viewPly?: number | null): Study {
+  if (viewPly == null) return game.study;
+  const ply = Math.max(0, Math.min(game.study.mainline.length, viewPly));
+  return {
+    ...game.study,
+    selectedId: ply === 0 ? game.study.rootId : game.study.mainline[ply - 1],
+  };
+}
+
+export function navigateHistory(
+  session: PlaySession,
+  target: 'start' | 'previous' | 'next' | 'end' | number,
+): PlaySession {
+  if (!session.game) return session;
+  const end = session.game.study.mainline.length;
+  const current = session.viewPly ?? end;
+  const ply =
+    typeof target === 'number'
+      ? target
+      : target === 'start'
+        ? 0
+        : target === 'end'
+          ? end
+          : current + (target === 'previous' ? -1 : 1);
+  return { ...session, viewPly: ply >= end ? null : Math.max(0, ply) };
+}
+
+export function annotateGame(game: PlayGame, ply: number, mark?: Mark): PlayGame {
+  const node = ply === 0 ? game.study.rootId : game.study.mainline[ply - 1];
+  if (!node || !game.study.nodes[node]) return game;
+  if (mark) return { ...game, study: toggleMark(game.study, node, mark) };
+  const study = {
+    ...game.study,
+    revision: game.study.revision + 1,
+    updatedAt: Date.now(),
+    nodes: { ...game.study.nodes, [node]: { ...game.study.nodes[node], marks: [] } },
+  };
+  return { ...game, study };
+}
+
+/** Review owns its copy, including any variations added after the handoff. */
+export function snapshotForReview(study: Study): Study {
+  return { ...structuredClone(study), id: crypto.randomUUID(), updatedAt: Date.now() };
+}
+
+function validMark(mark: unknown): mark is Mark {
+  if (!mark || typeof mark !== 'object') return false;
+  const value = mark as Record<string, unknown>;
+  const square = (s: unknown) => typeof s === 'string' && /^[a-h][1-8]$/.test(s);
+  if (!['green', 'red', 'orange', 'blue', 'yellow'].includes(value.color as string)) return false;
+  return value.kind === 'square'
+    ? square(value.square)
+    : value.kind === 'arrow' && square(value.from) && square(value.to);
+}
+
 export function serializeSession(session: PlaySession): string {
   const game = session.game;
   return JSON.stringify({
     version: 1,
     settings: session.settings,
     orientation: session.orientation,
+    viewPly: session.viewPly ?? null,
     game: game
       ? {
           id: game.study.id,
+          revision: game.study.revision,
           humanColor: game.humanColor,
           strengthId: game.strengthId,
           startedAt: game.startedAt,
           moves: positionAt(game.study, game.study.selectedId).moves,
           resigned: game.study.headers.Termination === 'Resignation',
+          marks: [game.study.rootId, ...game.study.mainline].map(
+            (id) => game.study.nodes[id].marks,
+          ),
         }
       : null,
   });
@@ -147,6 +209,7 @@ export function restoreSession(raw: string | null): PlaySession | null {
       if (
         typeof g.id !== 'string' ||
         !g.id ||
+        (g.revision !== undefined && (!Number.isSafeInteger(g.revision) || g.revision < 0)) ||
         !['w', 'b'].includes(g.humanColor) ||
         !strengths.some((s) => s.id === g.strengthId) ||
         !Number.isFinite(g.startedAt) ||
@@ -167,11 +230,30 @@ export function restoreSession(raw: string | null): PlaySession | null {
         game = advanceGame(game, move);
       }
       if (g.resigned) game = resignGame(game);
+      if (g.marks !== undefined) {
+        if (!Array.isArray(g.marks) || g.marks.length !== game.study.mainline.length + 1)
+          return null;
+        const ids = [game.study.rootId, ...game.study.mainline];
+        for (let i = 0; i < ids.length; i++) {
+          if (!Array.isArray(g.marks[i]) || !g.marks[i].every(validMark)) return null;
+          game.study.nodes[ids[i]].marks = g.marks[i];
+        }
+      }
+      // Older saves omitted revisions; their replayed move count remains a
+      // valid baseline. New saves retain annotation and resignation edits.
+      if (g.revision !== undefined) game.study.revision = g.revision;
     }
     return {
       game,
       settings: { side: saved.settings.side, strengthId: saved.settings.strengthId },
       orientation: saved.orientation,
+      viewPly:
+        game &&
+        Number.isInteger(saved.viewPly) &&
+        saved.viewPly >= 0 &&
+        saved.viewPly < game.study.mainline.length
+          ? saved.viewPly
+          : null,
     };
   } catch {
     return null;
