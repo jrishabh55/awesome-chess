@@ -16,6 +16,7 @@ import { openingFamilies, familyName } from '../openings/families';
 import { OpeningCombobox } from './OpeningCombobox';
 import { importPack, type OpeningPack } from './packs';
 import { CourseBrowser } from './CourseBrowser';
+import { useSavedCourses } from './useSavedCourses';
 import type { OpeningCourse } from './courses';
 import { databasePack } from './database';
 import {
@@ -34,9 +35,10 @@ import './library.css';
 const sideName = (side: Color) => (side === 'w' ? 'White' : 'Black');
 const message = (error: unknown) =>
   error instanceof Error ? error.message : 'This action could not be completed.';
-type LibraryTab = 'browse' | 'repertoires' | 'courses' | 'import';
+type LibraryTab = 'browse' | 'learned' | 'repertoires' | 'courses' | 'import';
 const tabs: { id: LibraryTab; name: string }[] = [
   { id: 'browse', name: 'Courses' },
+  { id: 'learned', name: 'Learned' },
   { id: 'repertoires', name: 'My repertoires' },
   { id: 'courses', name: 'Single lines' },
   { id: 'import', name: 'Import PGN' },
@@ -51,6 +53,7 @@ export function OpeningLibrary({
 }) {
   const uid = useId();
   const [tab, setTab] = useState<LibraryTab>('browse');
+  const savedCourses = useSavedCourses();
   const [entries, setEntries] = useState<CatalogOpening[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -259,6 +262,24 @@ export function OpeningLibrary({
             )}
           </div>
         )}
+        {(tab === 'browse' || tab === 'learned') && savedCourses.error && (
+          <div className="ol-error" role="alert">
+            <p>{savedCourses.error}</p>
+            <button className="ot-button" onClick={savedCourses.reload}>
+              Retry learning history
+            </button>
+          </div>
+        )}
+        {tab === 'learned' && !savedCourses.error && (
+          <CourseBrowser
+            key="learned"
+            view="learned"
+            entries={entries}
+            savedCourses={savedCourses.items}
+            onChoose={onChooseCourse}
+            onChoosePack={(pack) => perform(() => onChoose(pack))}
+          />
+        )}
         {tab === 'browse' &&
           (loading ? (
             <p className="ot-muted" role="status">
@@ -273,7 +294,9 @@ export function OpeningLibrary({
             </div>
           ) : (
             <CourseBrowser
+              key="browse"
               entries={entries}
+              savedCourses={savedCourses.items}
               onChoose={onChooseCourse}
               onChoosePack={(pack) => perform(() => onChoose(pack))}
             />

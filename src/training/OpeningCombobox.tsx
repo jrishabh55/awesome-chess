@@ -82,8 +82,14 @@ export function PickerCombobox<T extends { id: string }>({
     const measure = () => {
       const bounds = anchor.current!.getBoundingClientRect();
       const dialog = anchor.current!.closest('dialog')?.getBoundingClientRect();
-      const bottom = Math.min(window.innerHeight, dialog?.bottom ?? window.innerHeight) - 12;
-      const top = Math.max(0, dialog?.top ?? 0) + 12;
+      const content = anchor.current!.closest('.ol-content')?.getBoundingClientRect();
+      const bottom =
+        Math.min(
+          window.innerHeight,
+          dialog?.bottom ?? window.innerHeight,
+          content?.bottom ?? window.innerHeight,
+        ) - 12;
+      const top = Math.max(0, dialog?.top ?? 0, content?.top ?? 0) + 12;
       const below = bottom - bounds.bottom;
       const above = bounds.top - top;
       const upwards = below < 180 && above > below;

@@ -225,7 +225,7 @@
   border: 1px solid #4d5644;
   border-radius: 14px;
   width: min(570px, calc(100vw - 24px));
-  max-height: calc(100dvh - 32px);
+  max-height: min(640px, 80dvh);
   padding: 0;
 }
 .ot-dialog::backdrop {

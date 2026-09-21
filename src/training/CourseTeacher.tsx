@@ -7,6 +7,8 @@ import type { Color, DrawingColor, Mark, Square } from '../chess/types';
 import { OpeningLibrary } from './OpeningLibrary';
 import { databasePack } from './database';
 import { courseVariationLabel, type OpeningCourse } from './courses';
+import { courseProgress } from './course-progress';
+import { CourseSyllabus } from './CourseSyllabus';
 import {
   activeVariationIndex,
   CurriculumConflictError,
@@ -76,7 +78,8 @@ export function CourseTeacher({
     () => openingPlans(course.name, line, course.side),
     [course.name, line, course.side],
   );
-  const score = Object.values(session.scores).reduce((total, item) => total + item.best, 0);
+  const learningProgress = useMemo(() => courseProgress(course, session), [course, session]);
+  const score = learningProgress.points;
   const drillDone = session.phase === 'feedback';
   const roundDone = session.roundIndex + 1 >= session.round.length;
   const nextLabel = roundDone
@@ -539,22 +542,7 @@ export function CourseTeacher({
                   {course.name} · {score} points. Each clean drill earns 10 points, or 5 after a
                   mistake. Retrying keeps your best score.
                 </p>
-                <ol className="ct-section-progress">
-                  {course.sections.map((item) => (
-                    <li key={item.id}>
-                      <strong>{item.name}</strong>
-                      {item.commonPgn && <p className="course-prefix">{item.commonPgn}</p>}
-                      <span>
-                        {
-                          item.variationIndices.filter(
-                            (value) => value < session.lesson || finished,
-                          ).length
-                        }{' '}
-                        / {item.variationIndices.length} variations learned
-                      </span>
-                    </li>
-                  ))}
-                </ol>
+                <CourseSyllabus course={course} progress={learningProgress} heading={false} />
               </>
             )}
             {dialog === 'restart' && (

@@ -1,4 +1,4 @@
-.ol-dialog-content {
+.ot-dialog-content.ol-dialog-content {
   padding: 0;
 }
 .opening-library {
@@ -392,5 +392,62 @@
   }
   .ol-practice-row button {
     font-size: 10px;
+  }
+}
+
+/* One bounded content scroller; the title, close control and tabs stay visible. */
+.ot-dialog[open]:has(.opening-library) {
+  display: flex;
+  flex-direction: column;
+  width: min(620px, calc(100vw - 28px));
+  max-height: min(640px, 80dvh);
+  overflow: hidden;
+}
+.ot-dialog:has(.opening-library) .ot-dialog-header {
+  flex: none;
+  padding: 11px 16px;
+}
+.ot-dialog:has(.opening-library) .ot-dialog-header h2 {
+  font-size: 17px;
+}
+.ol-dialog-content {
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+}
+.opening-library {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.ol-tabs {
+  flex: none;
+  padding: 4px 12px 0;
+}
+.ol-tabs button {
+  font-size: 11px;
+  padding: 9px 8px;
+}
+.ol-content {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #526246 transparent;
+  padding: 14px 16px;
+}
+.ol-content > * {
+  flex-shrink: 0;
+}
+@media (max-width: 600px) {
+  .ol-tabs {
+    padding: 3px 6px 0;
+  }
+  .ol-tabs button {
+    padding: 8px 4px;
+    font-size: 10px;
+  }
+  .ol-content {
+    padding: 12px;
   }
 }

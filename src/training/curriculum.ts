@@ -287,7 +287,7 @@ function validate(course: OpeningCourse, session: CurriculumSession) {
   )
     throw damaged();
 }
-interface CurriculumSnapshot {
+export interface CurriculumSnapshot {
   course: OpeningCourse;
   session: CurriculumSession;
 }
@@ -344,6 +344,9 @@ export function loadCurriculum(courseId?: string): CurriculumSnapshot | null {
   if (!library) return null;
   const selected = courseId ?? library.activeCourseId;
   return Object.hasOwn(library.courses, selected) ? library.courses[selected] : null;
+}
+export function loadCurricula(): CurriculumSnapshot[] {
+  return Object.values(readLibrary()?.courses || {});
 }
 function canonicalSession(session: CurriculumSession): string {
   return JSON.stringify({

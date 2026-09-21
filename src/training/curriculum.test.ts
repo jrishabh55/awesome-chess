@@ -13,6 +13,7 @@ import {
   continueCurriculum,
   CURRICULUM_KEY,
   loadCurriculum,
+  loadCurricula,
   saveCurriculum,
   type CurriculumSession,
 } from './curriculum';
@@ -57,6 +58,19 @@ beforeEach(() => {
   });
 });
 afterEach(() => vi.unstubAllGlobals());
+
+it('lists all saved courses for learning history without replacing the active course', () => {
+  const second = { ...course, id: 'course:second', name: 'Second course' };
+  saveCurriculum(course, createCurriculum(course));
+  saveCurriculum(second, createCurriculum(second));
+  const before = store.get(CURRICULUM_KEY);
+  expect(loadCurricula().map((item) => item.course.id)).toEqual(['course:test', 'course:second']);
+  expect(store.get(CURRICULUM_KEY)).toBe(before);
+  expect(loadCurriculum()?.course.id).toBe('course:second');
+  store.set(CURRICULUM_KEY, '{broken');
+  expect(() => loadCurricula()).toThrow(/damaged/i);
+  expect(store.get(CURRICULUM_KEY)).toBe('{broken');
+});
 
 it('requires plans before drills and clamps guide navigation without revealing drill answers', () => {
   const session = createCurriculum(course);
