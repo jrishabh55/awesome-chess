@@ -37,3 +37,16 @@ it('restores every backup study and preserves conflicting local versions', async
   expect((await loadStudy(a.id))?.revision).toBe(10);
   expect((await listStudies()).some((s) => s.id === restored[1].id)).toBe(true);
 });
+
+it('saves and restores orange annotations without changing older colors', async () => {
+  const [study] = parsePgn('1. e4 *');
+  study.nodes.root.marks = [
+    { kind: 'square', square: 'a3', color: 'orange' },
+    { kind: 'arrow', from: 'b1', to: 'c3', color: 'orange' },
+    { kind: 'square', square: 'a4', color: 'yellow' },
+    { kind: 'arrow', from: 'g1', to: 'f3', color: 'blue' },
+  ];
+  await saveStudy(study);
+  expect((await loadStudy(study.id))?.nodes.root.marks).toEqual(study.nodes.root.marks);
+  expect(parseBackup(exportBackup([study]))[0].nodes.root.marks).toEqual(study.nodes.root.marks);
+});

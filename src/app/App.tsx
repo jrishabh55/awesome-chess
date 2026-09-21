@@ -80,6 +80,7 @@ import {
   activateUpdate,
 } from '../offline/download';
 import './styles.css';
+import './review-sidebar.css';
 const errorMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const saveFile = (name: string, text: string, type = 'text/plain') => {
   const url = URL.createObjectURL(new Blob([text], { type }));
@@ -108,7 +109,7 @@ export default function App() {
   const [tab, setTab] = useState<'review' | 'analysis' | 'openings'>('review'),
     [orientation, setOrientation] = useState<Color>('w'),
     [mode, setMode] = useState<'move' | 'arrow' | 'square'>('move'),
-    [drawingColor, setDrawingColor] = useState<DrawingColor>('green');
+    [drawingColor, setDrawingColor] = useState<DrawingColor>('red');
   const [flavor, setFlavor] = useState<EngineFlavor>('full'),
     [depth, setDepth] = useState(12),
     [infinite, setInfinite] = useState(false),
@@ -846,7 +847,6 @@ export default function App() {
                 onToggleMark={(m) => {
                   if (!demo && !retry) setStudy((s) => toggleMark(s, s.selectedId, m));
                 }}
-                onClearMarks={clearMarks}
                 drawingMode={mode}
                 drawingColor={drawingColor}
                 disabled={retryBusy || Boolean(demo)}
@@ -882,7 +882,7 @@ export default function App() {
                   <Square size={17} />
                 </button>
                 <div className="tool-divider" />
-                {(['green', 'red', 'blue', 'yellow'] as DrawingColor[]).map((c) => (
+                {(['red', 'orange', 'green', 'blue'] as DrawingColor[]).map((c) => (
                   <button
                     className={`color-dot ${c} ${drawingColor === c ? 'chosen' : ''}`}
                     key={c}
@@ -916,7 +916,7 @@ export default function App() {
               </div>
             </div>
             <div className="board-caption">
-              <span>Right-click: yellow / clear · Ctrl: red · Right-drag: arrow</span>
+              <span>Right-click / drag: red · Ctrl: orange · Shift: green</span>
               <span>
                 <Check size={12} />
                 {saved}
@@ -1165,7 +1165,11 @@ export default function App() {
               </div>
             )}
             <div className="moves-heading">
-              <span>MOVES</span>
+              <span className="current-opening">
+                <BookOpen size={18} />
+                {opening?.name ||
+                  (study.selectedId === study.rootId ? 'Starting position' : 'Game moves')}
+              </span>
               <span>
                 {study.mainline.length
                   ? `${Math.ceil(study.mainline.length / 2)} moves`
@@ -1179,40 +1183,6 @@ export default function App() {
               onSelect={navigate}
               hidden={Boolean(retry)}
             />
-            <div className="transport">
-              <button
-                aria-label="Go to start"
-                onClick={() => (demo ? setDemo({ ...demo, index: 0 }) : navigate(study.rootId))}
-                disabled={Boolean(retry)}
-              >
-                <ChevronsLeft size={23} />
-              </button>
-              <button aria-label="Previous move" onClick={() => step(-1)} disabled={Boolean(retry)}>
-                <ChevronLeft size={25} />
-              </button>
-              <button
-                aria-label={autoplay ? 'Pause playback' : 'Play moves'}
-                className="play-button"
-                onClick={() => setAutoplay((v) => !v)}
-                disabled={Boolean(retry)}
-              >
-                {autoplay ? <Pause size={21} /> : <Play size={21} fill="currentColor" />}
-              </button>
-              <button aria-label="Next move" onClick={() => step(1)} disabled={Boolean(retry)}>
-                <ChevronRight size={25} />
-              </button>
-              <button
-                aria-label="Go to end"
-                onClick={() =>
-                  demo
-                    ? setDemo({ ...demo, index: demo.line.length })
-                    : navigate(study.mainline.at(-1) || study.rootId)
-                }
-                disabled={Boolean(retry)}
-              >
-                <ChevronsRight size={23} />
-              </button>
-            </div>
             <div className="panel-body">
               {tab === 'review' && !retry ? (
                 <ReviewPanel
@@ -1283,6 +1253,40 @@ export default function App() {
                   hidden={Boolean(retry)}
                 />
               )}
+            </div>
+            <div className="transport">
+              <button
+                aria-label="Go to start"
+                onClick={() => (demo ? setDemo({ ...demo, index: 0 }) : navigate(study.rootId))}
+                disabled={Boolean(retry)}
+              >
+                <ChevronsLeft size={23} />
+              </button>
+              <button aria-label="Previous move" onClick={() => step(-1)} disabled={Boolean(retry)}>
+                <ChevronLeft size={25} />
+              </button>
+              <button
+                aria-label={autoplay ? 'Pause playback' : 'Play moves'}
+                className="play-button"
+                onClick={() => setAutoplay((v) => !v)}
+                disabled={Boolean(retry)}
+              >
+                {autoplay ? <Pause size={21} /> : <Play size={21} fill="currentColor" />}
+              </button>
+              <button aria-label="Next move" onClick={() => step(1)} disabled={Boolean(retry)}>
+                <ChevronRight size={25} />
+              </button>
+              <button
+                aria-label="Go to end"
+                onClick={() =>
+                  demo
+                    ? setDemo({ ...demo, index: demo.line.length })
+                    : navigate(study.mainline.at(-1) || study.rootId)
+                }
+                disabled={Boolean(retry)}
+              >
+                <ChevronsRight size={23} />
+              </button>
             </div>
             <div className="panel-footer">
               <button onClick={() => saveFile('chess-room.pgn', exportPgn(study))}>

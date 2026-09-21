@@ -1,7 +1,7 @@
 import type { Square } from 'chess.js';
 export type { Square };
 export type Color = 'w' | 'b';
-export type DrawingColor = 'green' | 'red' | 'blue' | 'yellow';
+export type DrawingColor = 'green' | 'red' | 'orange' | 'blue' | 'yellow';
 export type Mark =
   | { kind: 'square'; square: Square; color: DrawingColor }
   | { kind: 'arrow'; from: Square; to: Square; color: DrawingColor };

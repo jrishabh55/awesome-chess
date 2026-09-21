@@ -31,7 +31,7 @@ test('PWA reloads and runs real Stockfish plus reviews with networking disabled'
   await page.getByRole('textbox', { name: 'PGN or FEN' }).fill('1. f3 e5 2. g4 Qh4# 0-1');
   await page.getByRole('button', { name: 'Import & explore' }).click();
   await page.getByRole('tab', { name: 'Review', exact: true }).click();
-  await page.getByRole('button', { name: 'Review game', exact: true }).click();
+  await page.getByRole('button', { name: 'Game Review', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Review again', exact: true })).toBeVisible({
     timeout: 100000,
   });

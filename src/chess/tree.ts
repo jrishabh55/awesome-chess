@@ -109,21 +109,27 @@ export function toggleMark(study: Study, id: string, mark: Mark): Study {
   s.updatedAt = Date.now();
   return s;
 }
-const colors: Record<string, DrawingColor> = { G: 'green', R: 'red', B: 'blue', Y: 'yellow' };
+const colors: Record<string, DrawingColor> = {
+  G: 'green',
+  R: 'red',
+  O: 'orange',
+  B: 'blue',
+  Y: 'yellow',
+};
 function marksFrom(text: string): Mark[] {
   const out: Mark[] = [];
   for (const match of text.matchAll(/\[%c(al|sl)\s+([^\]]+)\]/g)) {
     for (const v of match[2].split(',')) {
       const code = v.trim();
       if (!colors[code[0]]) continue;
-      if (match[1] === 'al' && /^[GRBY][a-h][1-8][a-h][1-8]$/.test(code))
+      if (match[1] === 'al' && /^[GROBY][a-h][1-8][a-h][1-8]$/.test(code))
         out.push({
           kind: 'arrow',
           color: colors[code[0]],
           from: code.slice(1, 3) as Square,
           to: code.slice(3, 5) as Square,
         });
-      if (match[1] === 'sl' && /^[GRBY][a-h][1-8]$/.test(code))
+      if (match[1] === 'sl' && /^[GROBY][a-h][1-8]$/.test(code))
         out.push({ kind: 'square', color: colors[code[0]], square: code.slice(1) as Square });
     }
   }
@@ -194,7 +200,13 @@ export function exportPgn(s: Study): string {
   const tags = Object.entries(headers)
     .map(([k, v]) => `[${k} "${escape(v)}"]`)
     .join('\n');
-  const colorCode: Record<DrawingColor, string> = { green: 'G', red: 'R', blue: 'B', yellow: 'Y' };
+  const colorCode: Record<DrawingColor, string> = {
+    green: 'G',
+    red: 'R',
+    orange: 'O',
+    blue: 'B',
+    yellow: 'Y',
+  };
   const annotations = (n: GameNode) => {
     const comments = n.comments
       .map((c) =>

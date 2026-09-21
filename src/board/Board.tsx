@@ -7,7 +7,13 @@ import { MoveQualityIcon } from '../ui/MoveQualityIcon';
 import { arrowPath, type Point } from './geometry';
 import { reconcilePieces } from './pieces';
 import { labelInfo, type Label } from '../review/policy';
-const hues = { green: '#71b448', red: '#e56464', blue: '#57a1de', yellow: '#ebbd42' };
+const hues: Record<DrawingColor, string> = {
+  green: '#8fbb55',
+  red: '#f65c54',
+  orange: '#ffb547',
+  blue: '#57a1de',
+  yellow: '#ebbd42',
+};
 const pieceNames: Record<string, string> = {
   p: 'pawn',
   n: 'knight',
@@ -25,7 +31,6 @@ interface Props {
   coachMarks?: Mark[];
   onMove: (uci: string) => void;
   onToggleMark: (mark: Mark) => void;
-  onClearMarks: () => void;
   drawingMode: 'move' | 'arrow' | 'square';
   drawingColor: DrawingColor;
   disabled?: boolean;
@@ -41,7 +46,6 @@ export function Board({
   coachMarks = [],
   onMove,
   onToggleMark,
-  onClearMarks,
   drawingMode,
   drawingColor,
   disabled,
@@ -56,11 +60,9 @@ export function Board({
     y: number;
     color: DrawingColor;
     right: boolean;
-    ctrl: boolean;
   } | null>(null);
   const frame = useRef<number | null>(null);
   const [pointer, setPointer] = useState<Point | null>(null);
-  const [hideAutomatic, setHideAutomatic] = useState(false);
   const [pieces, setPieces] = useState(() => reconcilePieces([], fen));
   useLayoutEffect(() => setPieces((old) => reconcilePieces(old, fen)), [fen]);
   useEffect(
@@ -77,7 +79,6 @@ export function Board({
     setSelected(null);
     setPreview(null);
     setPointer(null);
-    setHideAutomatic(false);
     setPromotion(null);
     gesture.current = null;
   }, [fen, orientation, drawingMode]);
@@ -116,16 +117,7 @@ export function Board({
     if (selected && selected !== square) move(selected, square);
     else setSelected(chess.get(square)?.color === chess.turn() ? square : null);
   };
-  const allMarks = [
-    ...(hideHints ? [] : marks),
-    ...(!hideHints && !hideAutomatic ? engineMarks : []),
-    ...(!hideAutomatic ? coachMarks : []),
-  ];
-  const clearDrawings = () => {
-    onClearMarks();
-    setHideAutomatic(true);
-    setSelected(null);
-  };
+  const allMarks = [...(hideHints ? [] : marks), ...(!hideHints ? engineMarks : []), ...coachMarks];
   const finishGesture = () => {
     if (frame.current !== null) cancelAnimationFrame(frame.current);
     frame.current = null;
@@ -150,9 +142,15 @@ export function Board({
             draw: e.button === 2 || e.ctrlKey || drawingMode !== 'move',
             x: e.clientX,
             y: e.clientY,
-            color: e.ctrlKey ? 'red' : drawingColor,
+            color:
+              e.button === 2 || e.ctrlKey
+                ? e.ctrlKey
+                  ? 'orange'
+                  : e.shiftKey
+                    ? 'green'
+                    : 'red'
+                : drawingColor,
             right: e.button === 2 || e.ctrlKey,
-            ctrl: e.ctrlKey,
           };
           if (!gesture.current.draw && chess.get(from)?.color === chess.turn()) setSelected(from);
           e.currentTarget.setPointerCapture(e.pointerId);
@@ -191,13 +189,11 @@ export function Board({
             if (dragged && g.from !== to) {
               onToggleMark({ kind: 'arrow', from: g.from, to, color: g.color });
               setSelected(null);
-            } else if (g.right && !g.ctrl && allMarks.length) {
-              clearDrawings();
             } else if (g.right || drawingMode === 'square') {
               onToggleMark({
                 kind: 'square',
                 square: to,
-                color: g.ctrl ? 'red' : g.right ? 'yellow' : g.color,
+                color: g.color,
               });
             } else activate(to, true);
           } else if (dragged && g.from !== to) move(g.from, to);
@@ -303,7 +299,7 @@ export function Board({
                   width="1"
                   height="1"
                   fill={hues[mark.color]}
-                  opacity=".45"
+                  opacity=".65"
                 />
               );
             }
@@ -317,7 +313,7 @@ export function Board({
                 fill="none"
                 stroke={hues[mark.color]}
                 strokeWidth=".14"
-                opacity=".85"
+                opacity=".65"
                 strokeLinecap="butt"
                 strokeLinejoin="round"
                 markerEnd={`url(#arrow-${mark.color})`}
@@ -337,7 +333,7 @@ export function Board({
               strokeWidth=".14"
               strokeLinecap="butt"
               strokeLinejoin="round"
-              opacity=".8"
+              opacity=".65"
               markerEnd={`url(#arrow-${gesture.current.color})`}
             />
           )}

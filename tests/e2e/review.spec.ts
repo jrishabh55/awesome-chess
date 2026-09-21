@@ -30,11 +30,14 @@ test('imports a short completed game and reviews both players', async ({ page })
     .getByRole('textbox', { name: 'PGN or FEN' })
     .fill('[White "Learner"]\n[Black "Opponent"]\n\n1. f3 e5 2. g4 Qh4# 0-1');
   await page.getByRole('button', { name: 'Import & explore' }).click();
-  await page.getByRole('button', { name: 'Review game', exact: true }).click();
+  await page.getByRole('button', { name: 'Game Review', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Review again', exact: true })).toBeVisible({
     timeout: 110000,
   });
+  await page.getByText('Accuracy & full report', { exact: true }).click();
+  await expect(page.locator('.accuracy-card').first()).toBeVisible();
   await expect(page.locator('.accuracy-card strong').first()).not.toHaveText('—');
+  await page.getByText('Accuracy & full report', { exact: true }).click();
   await page.getByRole('button', { name: 'Start guided review' }).click();
   await expect(page.locator('.coach-card')).toBeVisible();
   const retry = page.getByRole('button', { name: 'Retry move', exact: true });

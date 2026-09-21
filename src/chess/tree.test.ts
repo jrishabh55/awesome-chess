@@ -65,3 +65,28 @@ it('exports drawings and comments from the starting position', async () => {
     color: 'blue',
   });
 });
+
+it('round-trips orange with every existing color in root and move annotations', () => {
+  const [study] = parsePgn(
+    '{[%csl Oa3,Ya4,Ba5,Ra6,Ga7]} 1. e4 {[%cal Ob1c3,Yg1f3,Ba1a3,Ra2a4,Ga7a5]} *',
+  );
+  const squares = [
+    { kind: 'square', square: 'a3', color: 'orange' },
+    { kind: 'square', square: 'a4', color: 'yellow' },
+    { kind: 'square', square: 'a5', color: 'blue' },
+    { kind: 'square', square: 'a6', color: 'red' },
+    { kind: 'square', square: 'a7', color: 'green' },
+  ];
+  const arrows = [
+    { kind: 'arrow', from: 'b1', to: 'c3', color: 'orange' },
+    { kind: 'arrow', from: 'g1', to: 'f3', color: 'yellow' },
+    { kind: 'arrow', from: 'a1', to: 'a3', color: 'blue' },
+    { kind: 'arrow', from: 'a2', to: 'a4', color: 'red' },
+    { kind: 'arrow', from: 'a7', to: 'a5', color: 'green' },
+  ];
+  expect(study.nodes.root.marks).toEqual(squares);
+  expect(study.nodes[study.mainline[0]].marks).toEqual(arrows);
+  const [restored] = parsePgn(exportPgn(study));
+  expect(restored.nodes.root.marks).toEqual(squares);
+  expect(restored.nodes[restored.mainline[0]].marks).toEqual(arrows);
+});

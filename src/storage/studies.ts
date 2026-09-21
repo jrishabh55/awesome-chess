@@ -44,7 +44,7 @@ const record = (v: unknown): v is Record<string, unknown> =>
 const square = (s: unknown) => typeof s === 'string' && /^[a-h][1-8]$/.test(s);
 function validMark(m: Mark) {
   return (
-    ['green', 'red', 'blue', 'yellow'].includes(m.color) &&
+    ['green', 'red', 'orange', 'blue', 'yellow'].includes(m.color) &&
     (m.kind === 'square' ? square(m.square) : m.kind === 'arrow' && square(m.from) && square(m.to))
   );
 }

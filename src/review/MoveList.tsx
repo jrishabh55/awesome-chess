@@ -2,6 +2,13 @@ import { MoveQualityIcon } from '../ui/MoveQualityIcon';
 import { useEffect, useRef } from 'react';
 import type { Study, GameNode } from '../chess/types';
 import { labelInfo, type MoveAssessment } from './policy';
+const figurines: Record<string, string[]> = {
+  K: ['♚', '♔'],
+  Q: ['♛', '♕'],
+  R: ['♜', '♖'],
+  B: ['♝', '♗'],
+  N: ['♞', '♘'],
+};
 export function MoveList({
   study,
   assessments,
@@ -14,9 +21,26 @@ export function MoveList({
   hidden?: boolean;
 }) {
   const active = useRef<HTMLButtonElement>(null);
+  const list = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    active.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  }, [study.selectedId]);
+    const container = list.current;
+    if (!container) return;
+    if (study.selectedId === study.rootId) {
+      container.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    const selected = active.current;
+    if (!selected) return;
+    const bounds = container.getBoundingClientRect();
+    const move = selected.getBoundingClientRect();
+    const delta =
+      move.top < bounds.top
+        ? move.top - bounds.top - 4
+        : move.bottom > bounds.bottom
+          ? move.bottom - bounds.bottom + 4
+          : 0;
+    if (delta) container.scrollBy({ top: delta, behavior: 'smooth' });
+  }, [study.selectedId, study.rootId]);
   if (hidden)
     return (
       <div className="move-list hidden-answer">Moves are hidden while you find a better move.</div>
@@ -30,9 +54,21 @@ export function MoveList({
         key={id}
         className={`move-cell ${id === study.selectedId ? 'active' : ''}`}
         onClick={() => onSelect(id)}
+        aria-label={n.san || undefined}
         title={a ? `${a.primary} · depth ${a.depth}` : 'Select position'}
       >
-        <span>{n.san}</span>
+        <span className="move-notation">
+          {n.san && /^[KQRBN]/.test(n.san) ? (
+            <>
+              <span className="move-piece" aria-hidden="true">
+                {figurines[n.san[0]][study.nodes[n.parentId!].fen.split(' ')[1] === 'w' ? 0 : 1]}
+              </span>
+              {n.san.slice(1)}
+            </>
+          ) : (
+            n.san
+          )}
+        </span>
         {a && (
           <span
             className="move-symbol"
@@ -103,7 +139,7 @@ export function MoveList({
     return rows;
   };
   return (
-    <div className="move-list">
+    <div className="move-list" ref={list}>
       <button
         className={`starting-position ${study.selectedId === study.rootId ? 'active' : ''}`}
         onClick={() => onSelect(study.rootId)}

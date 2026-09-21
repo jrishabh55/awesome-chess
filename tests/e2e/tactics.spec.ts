@@ -9,10 +9,10 @@ test('recognizes a verified queen sacrifice ending in forced mate', async ({ pag
     );
   await page.getByRole('button', { name: 'Import & explore' }).click();
   await page.getByRole('combobox', { name: 'Review speed' }).selectOption('deep');
-  await page.getByRole('button', { name: 'Review game', exact: true }).click();
+  await page.getByRole('button', { name: 'Game Review', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Review again', exact: true })).toBeVisible({
     timeout: 100000,
   });
-  await page.locator('.move-cell').filter({ hasText: 'Qb8+' }).click();
+  await page.getByRole('button', { name: 'Qb8+', exact: true }).click();
   await expect(page.locator('.coach-card h3')).toContainText('Brilliant');
 });

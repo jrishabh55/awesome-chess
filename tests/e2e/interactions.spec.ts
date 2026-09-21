@@ -56,37 +56,55 @@ test('pieces keep their identity and animate when moving and rewinding', async (
   expect(await pawn!.getAttribute('data-piece')).toBe('e2');
 });
 
-test('right drawing follows the pointer, makes knight elbows, and clears with a click', async ({
+test('right drawing uses the same color shortcuts for squares and smooth knight arrows', async ({
   page,
 }) => {
   await quietBoard(page);
-  const from = await center(page, 'b1'),
-    to = await center(page, 'c3');
-  await page.mouse.move(from.x, from.y);
-  await page.mouse.down({ button: 'right' });
-  await page.mouse.move(to.x - 9, to.y + 5, { steps: 6 });
-  const preview = page.locator('.drawing-preview');
-  await expect(preview).toBeVisible();
-  const first = await preview.getAttribute('d');
-  await page.mouse.move(to.x - 3, to.y + 2);
-  await expect(preview).not.toHaveAttribute('d', first!);
-  await page.mouse.move(to.x, to.y);
-  await page.mouse.up({ button: 'right' });
-  await expect(page.locator('.annotation-arrow')).toHaveAttribute(
-    'd',
-    'M 1.5 7.5 L 1.5 5.5 L 2.5 5.5',
-  );
+  const cases = [
+    { modifiers: [], color: '#f65c54', square: 'a3', from: 'b1', to: 'c3' },
+    { modifiers: ['Control'], color: '#ffb547', square: 'a4', from: 'g1', to: 'f3' },
+    { modifiers: ['Shift'], color: '#8fbb55', square: 'a5', from: 'b8', to: 'c6' },
+  ] as const;
+  for (const [index, sample] of cases.entries()) {
+    await page.getByRole('gridcell', { name: new RegExp(`^${sample.square} `) }).click({
+      button: 'right',
+      modifiers: [...sample.modifiers],
+    });
+    const square = page.locator(`.board-overlay rect[fill="${sample.color}"]`);
+    await expect(square).toHaveCount(1);
+    await expect(square).toHaveAttribute('opacity', '.65');
+    const from = await center(page, sample.from),
+      to = await center(page, sample.to);
+    for (const key of sample.modifiers) await page.keyboard.down(key);
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down({ button: 'right' });
+    await page.mouse.move(to.x - 9, to.y + 5, { steps: 6 });
+    const preview = page.locator('.drawing-preview');
+    await expect(preview).toBeVisible();
+    await expect(preview).toHaveAttribute('stroke', sample.color);
+    await expect(preview).toHaveAttribute('opacity', '.65');
+    const first = await preview.getAttribute('d');
+    await page.mouse.move(to.x - 3, to.y + 2);
+    await expect(preview).not.toHaveAttribute('d', first!);
+    await page.mouse.move(to.x, to.y);
+    await page.mouse.up({ button: 'right' });
+    for (const key of sample.modifiers) await page.keyboard.up(key);
+    const arrow = page.locator(`.annotation-arrow[stroke="${sample.color}"]`);
+    await expect(arrow).toHaveCount(1);
+    await expect(arrow).toHaveAttribute('opacity', '.65');
+    await expect(arrow).toHaveAttribute('stroke-linecap', 'butt');
+    if (index === 0) await expect(arrow).toHaveAttribute('d', 'M 1.5 7.5 L 1.5 5.5 L 2.5 5.5');
+    await expect(page.locator('.board-overlay rect')).toHaveCount(index + 1);
+    await expect(page.locator('.annotation-arrow')).toHaveCount(index + 1);
+  }
+  // A second click toggles only that square; all other annotations survive.
   await page.getByRole('gridcell', { name: 'a3 empty', exact: true }).click({ button: 'right' });
+  await expect(page.locator('.board-overlay rect')).toHaveCount(2);
+  await expect(page.locator('.board-overlay rect[fill="#f65c54"]')).toHaveCount(0);
+  await expect(page.locator('.annotation-arrow')).toHaveCount(3);
+  await page.getByRole('button', { name: 'Clear annotations', exact: true }).click();
+  await expect(page.locator('.board-overlay rect')).toHaveCount(0);
   await expect(page.locator('.annotation-arrow')).toHaveCount(0);
-  await expect(page.locator('.board-overlay rect')).toHaveCount(0);
-  await page.getByRole('gridcell', { name: 'a3 empty', exact: true }).click({ button: 'right' });
-  await expect(page.locator('.board-overlay rect')).toHaveAttribute('fill', '#ebbd42');
-  await page
-    .getByRole('gridcell', { name: 'a4 empty', exact: true })
-    .click({ button: 'right', modifiers: ['Control'] });
-  await expect(page.locator('.board-overlay rect[fill="#e56464"]')).toHaveCount(1);
-  await page.getByRole('gridcell', { name: 'a5 empty', exact: true }).click({ button: 'right' });
-  await expect(page.locator('.board-overlay rect')).toHaveCount(0);
 });
 
 test('moves precede the report and move-quality badges use real icons', async ({ page }) => {
