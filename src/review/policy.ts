@@ -24,16 +24,16 @@ export const labels: Label[] = [
   'Miss',
 ];
 export const labelInfo: Record<Label, { symbol: string; color: string }> = {
-  Brilliant: { symbol: '!!', color: '#26c2a3' },
-  Great: { symbol: '!', color: '#71a9e2' },
-  Best: { symbol: '★', color: '#99bf65' },
-  Excellent: { symbol: '✓', color: '#99bf65' },
-  Good: { symbol: '•', color: '#a8b294' },
+  Brilliant: { symbol: '!!', color: '#1bada6' },
+  Great: { symbol: '!', color: '#1bada6' },
+  Best: { symbol: '★', color: '#96bc4b' },
+  Excellent: { symbol: '✓', color: '#96bc4b' },
+  Good: { symbol: '•', color: '#96af8b' },
   Book: { symbol: '▤', color: '#b9a387' },
-  Inaccuracy: { symbol: '?!', color: '#e8c25b' },
-  Mistake: { symbol: '?', color: '#e59b50' },
-  Blunder: { symbol: '??', color: '#e9776e' },
-  Miss: { symbol: '↗', color: '#e68a73' },
+  Inaccuracy: { symbol: '?!', color: '#f7c045' },
+  Mistake: { symbol: '?', color: '#e58f2a' },
+  Blunder: { symbol: '??', color: '#f4776f' },
+  Miss: { symbol: '↗', color: '#dbac16' },
 };
 export interface Evidence {
   kind: 'fork' | 'pin' | 'material' | 'mate' | 'sacrifice' | 'unique' | 'miss';

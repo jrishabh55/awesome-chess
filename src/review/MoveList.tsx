@@ -75,7 +75,7 @@ export function MoveList({
             style={{ color: labelInfo[a.primary].color }}
             aria-label={a.primary}
           >
-            <MoveQualityIcon label={a.primary} size={16} />
+            <MoveQualityIcon label={a.primary} size={18} />
           </span>
         )}
       </button>

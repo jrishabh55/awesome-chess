@@ -114,7 +114,22 @@ test('moves precede the report and move-quality badges use real icons', async ({
   await expect(page.getByRole('img', { name: 'Book move', exact: true })).toBeVisible({
     timeout: 90000,
   });
-  await expect(page.locator('.board-badge svg')).toHaveCount(1);
+  await expect(page.locator('.board-badge .move-quality-icon')).toHaveCount(1);
+  await page.getByText('Accuracy & full report', { exact: true }).click();
+  await expect(page.locator('.classification-table .move-quality-icon')).toHaveCount(10);
+  await expect
+    .poll(() =>
+      page
+        .locator('.move-quality-icon')
+        .evaluateAll((icons) =>
+          icons.every(
+            (icon) =>
+              (icon as HTMLImageElement).complete && (icon as HTMLImageElement).naturalWidth > 0,
+          ),
+        ),
+    )
+    .toBe(true);
+  await page.getByText('Accuracy & full report', { exact: true }).click();
   await expect(page.locator('.eval-chart')).toHaveCount(0);
   expect(
     await page

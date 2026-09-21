@@ -93,4 +93,4 @@ When an update is offered, **Save & update** saves the current study and review 
 
 ## Source and licenses
 
-This application's source is GPL-3.0-or-later; see [LICENSE](LICENSE). Stockfish is GPLv3 and its exact corresponding-source link is recorded in the engine manifest. Opening data is CC0; the Cburnett pieces are CC BY-SA 3.0. See [third-party notices](THIRD_PARTY_NOTICES.md) and `public/licenses/`.
+This application's source is GPL-3.0-or-later; see [LICENSE](LICENSE). Stockfish is GPLv3 and its exact corresponding-source link is recorded in the engine manifest. Opening data is CC0; the Cburnett pieces are CC BY-SA 3.0. Move-quality badges use the supplied `brilliance_v2.zip` SVGs, with provenance recorded separately. See [third-party notices](THIRD_PARTY_NOTICES.md) and `public/licenses/`.

@@ -67,6 +67,13 @@ button:hover {
 button svg {
   flex-shrink: 0;
 }
+.move-quality-icon {
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+  object-fit: contain;
+  pointer-events: none;
+}
 a {
   color: var(--accent);
 }

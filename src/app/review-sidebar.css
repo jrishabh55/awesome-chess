@@ -326,8 +326,9 @@
     gap: 9px;
     font-size: 12px;
   }
-  .review-highlights svg {
+  .review-highlights .move-quality-icon {
     width: 17px;
+    height: 17px;
   }
   .analysis-column .review-action > .primary {
     font-size: 23px;

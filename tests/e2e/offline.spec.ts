@@ -35,6 +35,20 @@ test('PWA reloads and runs real Stockfish plus reviews with networking disabled'
   await expect(page.getByRole('button', { name: 'Review again', exact: true })).toBeVisible({
     timeout: 100000,
   });
+  await page.getByText('Accuracy & full report', { exact: true }).click();
+  const badges = page.locator('.classification-table .move-quality-icon');
+  await expect(badges).toHaveCount(10);
+  await expect
+    .poll(() =>
+      badges.evaluateAll((icons) =>
+        icons.every(
+          (icon) =>
+            (icon as HTMLImageElement).complete && (icon as HTMLImageElement).naturalWidth > 0,
+        ),
+      ),
+    )
+    .toBe(true);
+  await page.getByText('Accuracy & full report', { exact: true }).click();
   await page.getByRole('button', { name: 'Review again', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Review again', exact: true })).toBeVisible({
     timeout: 100000,
