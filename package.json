@@ -10,7 +10,10 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "preview": "vite preview --host 127.0.0.1",
-    "prepare:assets": "node scripts/prepare-assets.mjs"
+    "prepare:assets": "node scripts/prepare-assets.mjs",
+    "format": "prettier --write src scripts tests *.ts *.json public/sw.js",
+    "icons": "node scripts/generate-icons.mjs",
+    "test:production": "TEST_URL=http://127.0.0.1:5174 playwright test"
   },
   "dependencies": {
     "@mliebelt/pgn-parser": "1.4.19",
@@ -28,8 +31,13 @@
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.1",
     "fake-indexeddb": "6.2.5",
+    "prettier": "3.9.8",
     "typescript": "7.0.2",
     "vite": "8.3.0",
     "vitest": "5.0.1"
+  },
+  "license": "GPL-3.0-or-later",
+  "engines": {
+    "node": ">=22.14.0"
   }
 }

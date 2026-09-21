@@ -409,4 +409,4 @@ test('analysis can branch without replacing the imported game', async ({ page })
 
 ## Approval status
 
-Written against the user-approved design. Awaiting user review of this plan and choice of execution method before product implementation, as required by the writing-plans workflow.
+Approved for Native execution by the user (option 1). Implementation completed on `feat/local-review`. Final verification: 40 unit/integration tests, 7 production browser tests, TypeScript and production build passed. See `docs/delivery.md` for execution decisions and the independent-review fixes. The original step checklist is retained as the planning record; the delivered behavior and verification are recorded in the delivery report.

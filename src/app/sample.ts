@@ -1,4 +1,4 @@
-export const samplePgn=`[Event "The Opera Game"]
+export const samplePgn = `[Event "The Opera Game"]
 [Site "Paris"]
 [Date "1858.??.??"]
 [White "Paul Morphy"]

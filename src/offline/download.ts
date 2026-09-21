@@ -1,9 +1,116 @@
-import type {EngineFlavor} from '../engine/types';
-interface Asset{url:string;size:number;sha256:string;flavor:EngineFlavor}
-interface Manifest{version:string;assets:Asset[]}
-async function manifest():Promise<Manifest>{const r=await fetch('/engine/manifest.json');if(!r.ok)throw Error('Engine manifest is unavailable.');return r.json();}
-export async function engineSize(flavor:EngineFlavor){const m=await manifest();return m.assets.filter(a=>a.flavor===flavor).reduce((n,a)=>n+a.size,0);}
-export async function isAssetSetReady(flavor:EngineFlavor){try{const m=await manifest();const cache=await caches.open(`engine-${m.version}-${flavor}`);for(const a of m.assets.filter(a=>a.flavor===flavor))if(!await cache.match(a.url))return false;return Boolean(await cache.match('/offline-ready'));}catch{return false;}}
-export async function downloadAssetSet(flavor:EngineFlavor,signal:AbortSignal,onProgress:(loaded:number,total:number)=>void){const m=await manifest(),assets=m.assets.filter(a=>a.flavor===flavor),total=assets.reduce((n,a)=>n+a.size,0);const name=`engine-${m.version}-${flavor}`,staging=name+'-staging';await caches.delete(staging);const cache=await caches.open(staging);let loaded=0;try{for(const asset of assets){const r=await fetch(asset.url,{signal,cache:'no-store'});if(!r.ok||!r.body)throw Error('Engine download failed. Please retry.');const reader=r.body.getReader(),chunks:Uint8Array[]=[];while(true){const {done,value}=await reader.read();if(done)break;chunks.push(value);loaded+=value.length;onProgress(loaded,total);}const bytes=new Uint8Array(chunks.reduce((n,c)=>n+c.length,0));let offset=0;for(const c of chunks){bytes.set(c,offset);offset+=c.length;}const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))).map(b=>b.toString(16).padStart(2,'0')).join('');if(digest!==asset.sha256||bytes.length!==asset.size)throw Error('Engine verification failed. Please retry the download.');await cache.put(asset.url,new Response(bytes,{headers:{'Content-Type':asset.url.endsWith('.wasm')?'application/wasm':'text/javascript'}}));}const committed=await caches.open(name);for(const a of assets)await committed.put(a.url,(await cache.match(a.url))!);await committed.put('/engine/manifest.json',new Response(JSON.stringify(m),{headers:{'Content-Type':'application/json'}}));await committed.put('/offline-ready',new Response('verified'));await navigator.storage?.persist?.();}finally{await caches.delete(staging);}}
-export function registerOffline(onUpdate:()=>void){if(!('serviceWorker' in navigator)||import.meta.env.DEV)return;void navigator.serviceWorker.register('/sw.js').then(reg=>{if(reg.waiting)onUpdate();reg.addEventListener('updatefound',()=>{reg.installing?.addEventListener('statechange',()=>{if(reg.waiting&&navigator.serviceWorker.controller)onUpdate();});});}).catch(()=>{});}
-export async function activateUpdate(){const reg=await navigator.serviceWorker.getRegistration();reg?.waiting?.postMessage('ACTIVATE');navigator.serviceWorker.addEventListener('controllerchange',()=>location.reload(),{once:true});}
+import { ENGINE_BUILD_ID } from '../engine/build';
+import type { EngineFlavor } from '../engine/types';
+interface Asset {
+  url: string;
+  size: number;
+  sha256: string;
+  flavor: EngineFlavor;
+}
+interface Manifest {
+  version: string;
+  buildId: string;
+  assets: Asset[];
+}
+async function manifest(): Promise<Manifest> {
+  const r = await fetch(`/engine/manifest-${ENGINE_BUILD_ID}.json`);
+  if (!r.ok) throw Error('Engine manifest is unavailable.');
+  return r.json();
+}
+export async function engineSize(flavor: EngineFlavor) {
+  const m = await manifest();
+  return m.assets.filter((a) => a.flavor === flavor).reduce((n, a) => n + a.size, 0);
+}
+export async function isAssetSetReady(flavor: EngineFlavor) {
+  try {
+    const m = await manifest();
+    const cache = await caches.open(`engine-${m.buildId}-${flavor}`);
+    for (const a of m.assets.filter((a) => a.flavor === flavor))
+      if (!(await cache.match(`${a.url}?build=${m.buildId}`))) return false;
+    return Boolean(await cache.match('/offline-ready'));
+  } catch {
+    return false;
+  }
+}
+export async function downloadAssetSet(
+  flavor: EngineFlavor,
+  signal: AbortSignal,
+  onProgress: (loaded: number, total: number) => void,
+) {
+  const m = await manifest(),
+    assets = m.assets.filter((a) => a.flavor === flavor),
+    total = assets.reduce((n, a) => n + a.size, 0);
+  const name = `engine-${m.buildId}-${flavor}`,
+    staging = name + '-staging';
+  await caches.delete(staging);
+  const cache = await caches.open(staging);
+  let loaded = 0;
+  try {
+    for (const asset of assets) {
+      const r = await fetch(`${asset.url}?build=${m.buildId}`, { signal, cache: 'no-store' });
+      if (!r.ok || !r.body) throw Error('Engine download failed. Please retry.');
+      const reader = r.body.getReader(),
+        chunks: Uint8Array[] = [];
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        loaded += value.length;
+        onProgress(loaded, total);
+      }
+      const bytes = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0));
+      let offset = 0;
+      for (const c of chunks) {
+        bytes.set(c, offset);
+        offset += c.length;
+      }
+      const digest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)))
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('');
+      if (digest !== asset.sha256 || bytes.length !== asset.size)
+        throw Error('Engine verification failed. Please retry the download.');
+      await cache.put(
+        `${asset.url}?build=${m.buildId}`,
+        new Response(bytes, {
+          headers: {
+            'Content-Type': asset.url.endsWith('.wasm') ? 'application/wasm' : 'text/javascript',
+          },
+        }),
+      );
+    }
+    const committed = await caches.open(name);
+    for (const a of assets)
+      await committed.put(
+        `${a.url}?build=${m.buildId}`,
+        (await cache.match(`${a.url}?build=${m.buildId}`))!,
+      );
+    await committed.put(
+      `/engine/manifest-${ENGINE_BUILD_ID}.json`,
+      new Response(JSON.stringify(m), { headers: { 'Content-Type': 'application/json' } }),
+    );
+    await committed.put('/offline-ready', new Response('verified'));
+    await navigator.storage?.persist?.();
+  } finally {
+    await caches.delete(staging);
+  }
+}
+export function registerOffline(onUpdate: () => void) {
+  if (!('serviceWorker' in navigator) || import.meta.env.DEV) return;
+  void navigator.serviceWorker
+    .register('/sw.js')
+    .then((reg) => {
+      if (reg.waiting) onUpdate();
+      reg.addEventListener('updatefound', () => {
+        reg.installing?.addEventListener('statechange', () => {
+          if (reg.waiting && navigator.serviceWorker.controller) onUpdate();
+        });
+      });
+    })
+    .catch(() => {});
+}
+export async function activateUpdate() {
+  const reg = await navigator.serviceWorker.getRegistration();
+  reg?.waiting?.postMessage('ACTIVATE');
+  navigator.serviceWorker.addEventListener('controllerchange', () => location.reload(), {
+    once: true,
+  });
+}

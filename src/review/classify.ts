@@ -1,29 +1,392 @@
-import {Chess} from 'chess.js';
-import type {Color,PositionInput,Square,Study,Mark} from '../chess/types';
-import {chessAt,positionAt} from '../chess/tree';
-import {isBook} from '../openings/lookup';
-import {EngineClient} from '../engine/worker-client';
-import type {EngineLine,AnalysisResult} from '../engine/types';
-import {baseLabel,primaryLabel,scoreExpected,type Evidence,type MoveAssessment} from './policy';
-const values:Record<string,number>={p:1,n:3,b:3,r:5,q:9,k:0};
-export function material(c:Chess,color:Color):number{return c.board().flat().reduce((v,p)=>v+(p?values[p.type]*(p.color===color?1:-1):0),0);}
-const chessFor=(p:PositionInput)=>{const c=new Chess(p.rootFen);p.moves.forEach(m=>c.move(m));return c;};
-interface Input{nodeId:string;mover:Color;playedUci:string;book:boolean;legalCount:number;best:EngineLine;played:EngineLine;second?:EngineLine;evidence:Evidence[]}
-export function classify(i:Input):MoveAssessment{const best=scoreExpected(i.best.score,i.mover),played=scoreExpected(i.played.score,i.mover);const loss=Math.max(0,best-played);let base=baseLabel(loss,i.best.pv[0]===i.playedUci);if(i.played.score.kind==='mate'&&i.played.score.winner!==i.mover&&!(i.best.score.kind==='mate'&&i.best.score.winner!==i.mover))base='Blunder';else if(i.best.score.kind==='mate'&&i.best.score.winner===i.mover&&i.played.score.kind!=='mate'&&['Best','Excellent','Good'].includes(base))base='Inaccuracy';const flags={brilliant:i.evidence.some(e=>e.kind==='sacrifice'),great:i.evidence.some(e=>e.kind==='unique'),miss:i.evidence.some(e=>e.kind==='miss')};const gap=i.second?Math.max(0,best-scoreExpected(i.second.score,i.mover)):0;return {nodeId:i.nodeId,mover:i.mover,base,primary:primaryLabel(base,i.book,flags),book:i.book,loss,moveAccuracy:100*Math.exp(-5*loss),bestUci:i.best.pv[0]||i.playedUci,evidence:i.evidence,depth:Math.min(i.best.depth,i.played.depth),policyVersion:1,meaningful:i.legalCount>1&&((best>=.1&&best<=.9)||flags.great),criticalGap:gap,before:i.best.score,after:i.played.score,bestLine:i.best.pv,playedLine:i.played.pv,forced:i.legalCount===1};}
-export function detectEvidence(root:PositionInput,line:EngineLine):Evidence[]{const c=chessFor(root),mover=c.turn();const baseline=material(c,mover);const out:Evidence[]=[];const frames:Evidence['frames']=[];const valid:string[]=[];let gain=0;for(const [index,uci] of line.pv.slice(0,12).entries()){let m;try{m=c.move(uci);}catch{break;}valid.push(uci);const marks:Mark[]=[{kind:'arrow',from:m.from,to:m.to,color:'green'}];if(m.captured)marks.push({kind:'square',square:m.to,color:'red'});frames.push({ply:index+1,marks});if(index===0&&m.color===mover){const attacked=c.board().flat().filter(p=>p&&p.color!==mover&&(p.type==='k'||values[p.type]>=3)&&c.attackers(p.square,mover).includes(m.to));if(attacked.length>=2)out.push({kind:'fork',root,line:line.pv.slice(0,8),frames:[{ply:1,marks:attacked.map(p=>({kind:'arrow',from:m.to,to:p!.square,color:'green'}))}],verifiedDepth:line.depth,facts:{attacker:m.to,targets:attacked.map(p=>p!.square).join(', '),forcedWin:false}});
- // Absolute pin along a slider ray to the enemy king.
- if(['b','r','q'].includes(m.piece)){const enemyKing=c.board().flat().find(p=>p?.type==='k'&&p.color!==mover);if(enemyKing){const x=m.to.charCodeAt(0),y=Number(m.to[1]),dx=enemyKing.square.charCodeAt(0)-x,dy=Number(enemyKing.square[1])-y;const diagonal=Math.abs(dx)===Math.abs(dy),straight=dx===0||dy===0;if((diagonal&&m.piece!=='r')||(straight&&m.piece!=='b')){const sx=Math.sign(dx),sy=Math.sign(dy);const between:Square[]=[];for(let k=1;k<Math.max(Math.abs(dx),Math.abs(dy));k++)between.push(`${String.fromCharCode(x+k*sx)}${y+k*sy}` as Square);const occupied=between.filter(s=>c.get(s));if(occupied.length===1&&c.get(occupied[0])?.color!==mover)out.push({kind:'pin',root,line:line.pv.slice(0,8),frames:[{ply:1,marks:[{kind:'arrow',from:m.to,to:enemyKing.square,color:'yellow'},{kind:'square',square:occupied[0],color:'red'}]}],verifiedDepth:line.depth,facts:{piece:occupied[0],king:enemyKing.square}});}}}}
- if(index>=3)gain=material(c,mover)-baseline;
- if(c.isCheckmate()&&c.turn()!==mover){out.push({kind:'mate',root,line:valid.slice(),frames:frames.slice(),verifiedDepth:line.depth,facts:{plies:valid.length}});break;}}
- if(valid.length>=4&&gain>=2)out.push({kind:'material',root,line:valid,frames,verifiedDepth:line.depth,facts:{gain}});return out;}
-export async function assessMove(s:Study,nodeId:string,engine:EngineClient,signal:AbortSignal,depth=12,priority='review'):Promise<MoveAssessment>{const n=s.nodes[nodeId];if(!n?.parentId)throw Error('Select a move to assess');const root=positionAt(s,n.parentId),c=chessAt(s,n.parentId),mover=c.turn(),legal=c.moves({verbose:true}).map(m=>m.from+m.to+(m.promotion||''));let sequence=0;
- const search=async(p:PositionInput,d:number,multiPv=1,rootMoves?:string[])=>engine.analyze({id:`${priority}:${s.id}:${nodeId}:${++sequence}`,position:p,budget:{kind:'depth',depth:d},multiPv,rootMoves},signal);
- let result=await search(root,depth,Math.min(3,legal.length));let best=result.lines[0],second=result.lines[1];if(!best?.pv[0])throw Error('No legal reference move');let played=result.lines.find(l=>l.pv[0]===n.uci);if(!played)played=(await search(root,depth,1,[n.uci!])).lines[0];let evidence:Evidence[]=detectEvidence(root,played);const provisional=classify({nodeId,mover,playedUci:n.uci!,book:isBook(n.fen),legalCount:legal.length,best,played,second,evidence:[]});
- const after=chessAt(s,nodeId),captures=after.moves({verbose:true}).filter(m=>m.captured&&m.to===n.uci!.slice(2,4));const materialDrop=(()=>{try{const trial=chessFor(root);played.pv.slice(0,4).forEach(m=>trial.move(m));return material(c,mover)-material(trial,mover);}catch{return 0;}})();const candidateSacrifice=provisional.loss<=.01&&scoreExpected(played.score,mover)>=.4&&captures.length>0&&materialDrop>=2&&played.pv.length>=4&&legal.length>1;
- const gap=second?scoreExpected(best.score,mover)-scoreExpected(second.score,mover):0;const candidateGreat=provisional.base==='Best'&&legal.length>1&&gap>=.12;const opportunities=detectEvidence(root,best).filter(e=>e.kind==='mate'||e.kind==='material');const candidateMiss=provisional.loss>.03&&opportunities.length>0;
- if(candidateSacrifice||candidateGreat||candidateMiss){const verifyDepth=Math.max(18,depth+2);result=await search(root,verifyDepth,Math.min(3,legal.length));best=result.lines[0];second=result.lines[1];played=result.lines.find(l=>l.pv[0]===n.uci)||(await search(root,verifyDepth,1,[n.uci!])).lines[0];evidence=detectEvidence(root,played);const p=scoreExpected(played.score,mover),b=scoreExpected(best.score,mover);
- if(candidateGreat&&best.pv[0]===n.uci){const alternative=(await search(root,verifyDepth,1,legal.filter(m=>m!==n.uci))).lines[0];second=alternative;const a=scoreExpected(alternative.score,mover);if(b-a>=.12&&((b>=.4&&a<=.25)||(b>=.75&&a<=.55)))evidence.push({kind:'unique',root,line:best.pv,frames:[],verifiedDepth:verifyDepth,facts:{gap:b-a}});}
- if(candidateSacrifice&&b-p<=.01&&p>=.4){let sound=true;for(const capture of captures){const acceptance=(await search(positionAt(s,nodeId),verifyDepth,1,[capture.from+capture.to+(capture.promotion||'')])).lines[0];if(scoreExpected(acceptance.score,mover)<.4){sound=false;break;}const trial=chessAt(s,nodeId);try{acceptance.pv.slice(0,3).forEach(m=>trial.move(m));}catch{sound=false;}if(material(c,mover)-material(trial,mover)<2)sound=false;}if(sound)evidence.push({kind:'sacrifice',root,line:played.pv,frames:[{ply:1,marks:[{kind:'square',square:n.uci!.slice(2,4) as Square,color:'blue'}]}],verifiedDepth:verifyDepth,facts:{material:materialDrop}});}
- if(candidateMiss&&b-p>.03){const winning=detectEvidence(root,best).find(e=>e.kind==='mate'||e.kind==='material');const actual=detectEvidence(root,played).some(e=>e.kind===winning?.kind);if(winning&&!actual)evidence.push({...winning,kind:'miss',facts:{...winning.facts,opportunity:winning.kind}});}}
- return classify({nodeId,mover,playedUci:n.uci!,book:isBook(n.fen),legalCount:legal.length,best,played,second,evidence});}
-export function sanLine(root:PositionInput,pv:string[],limit=8):string{const c=chessFor(root),out:string[]=[];for(const uci of pv.slice(0,limit)){try{const number=c.fen().split(' ')[5],turn=c.turn();const m=c.move(uci);out.push(`${turn==='w'?number+'. ':out.length===0?number+'… ':''}${m.san}`);}catch{break;}}return out.join(' ');}
+import { Chess } from 'chess.js';
+import type { Color, PositionInput, Square, Study, Mark } from '../chess/types';
+import { chessAt, positionAt } from '../chess/tree';
+import { isBook } from '../openings/lookup';
+import { EngineClient } from '../engine/worker-client';
+import type { EngineLine, AnalysisResult } from '../engine/types';
+import {
+  baseLabel,
+  primaryLabel,
+  scoreExpected,
+  type Evidence,
+  type MoveAssessment,
+} from './policy';
+const values: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
+export function material(c: Chess, color: Color): number {
+  return c
+    .board()
+    .flat()
+    .reduce((v, p) => v + (p ? values[p.type] * (p.color === color ? 1 : -1) : 0), 0);
+}
+const chessFor = (p: PositionInput) => {
+  const c = new Chess(p.rootFen);
+  p.moves.forEach((m) => c.move(m));
+  return c;
+};
+interface Input {
+  nodeId: string;
+  mover: Color;
+  playedUci: string;
+  book: boolean;
+  legalCount: number;
+  best: EngineLine;
+  played: EngineLine;
+  second?: EngineLine;
+  evidence: Evidence[];
+}
+export function classify(i: Input): MoveAssessment {
+  const best = scoreExpected(i.best.score, i.mover),
+    played = scoreExpected(i.played.score, i.mover);
+  const loss = Math.max(0, best - played);
+  let base = baseLabel(loss, i.best.pv[0] === i.playedUci);
+  if (
+    i.played.score.kind === 'mate' &&
+    i.played.score.winner !== i.mover &&
+    !(i.best.score.kind === 'mate' && i.best.score.winner !== i.mover)
+  )
+    base = 'Blunder';
+  else if (
+    i.best.score.kind === 'mate' &&
+    i.best.score.winner === i.mover &&
+    i.played.score.kind !== 'mate' &&
+    ['Best', 'Excellent', 'Good'].includes(base)
+  )
+    base = 'Inaccuracy';
+  const flags = {
+    brilliant: i.evidence.some((e) => e.kind === 'sacrifice'),
+    great: i.evidence.some((e) => e.kind === 'unique'),
+    miss: i.evidence.some((e) => e.kind === 'miss'),
+  };
+  const gap = i.second ? Math.max(0, best - scoreExpected(i.second.score, i.mover)) : 0;
+  return {
+    nodeId: i.nodeId,
+    mover: i.mover,
+    base,
+    primary: primaryLabel(base, i.book, flags),
+    book: i.book,
+    loss,
+    moveAccuracy: 100 * Math.exp(-5 * loss),
+    bestUci: i.best.pv[0] || i.playedUci,
+    evidence: i.evidence,
+    depth: Math.min(i.best.depth, i.played.depth),
+    policyVersion: 1,
+    meaningful: i.legalCount > 1 && ((best >= 0.1 && best <= 0.9) || flags.great),
+    criticalGap: gap,
+    before: i.best.score,
+    after: i.played.score,
+    bestLine: i.best.pv,
+    playedLine: i.played.pv,
+    forced: i.legalCount === 1,
+  };
+}
+export function detectEvidence(root: PositionInput, line: EngineLine): Evidence[] {
+  const c = chessFor(root),
+    mover = c.turn();
+  const baseline = material(c, mover);
+  const out: Evidence[] = [];
+  const frames: Evidence['frames'] = [];
+  const valid: string[] = [];
+  let gain = 0;
+  for (const [index, uci] of line.pv.slice(0, 12).entries()) {
+    let m;
+    try {
+      m = c.move(uci);
+    } catch {
+      break;
+    }
+    valid.push(uci);
+    const marks: Mark[] = [{ kind: 'arrow', from: m.from, to: m.to, color: 'green' }];
+    if (m.captured) marks.push({ kind: 'square', square: m.to, color: 'red' });
+    frames.push({ ply: index + 1, marks });
+    if (index === 0 && m.color === mover) {
+      const legalTurn = new Chess(
+        c
+          .fen()
+          .split(' ')
+          .map((field, i) => (i === 1 ? mover : i === 3 ? '-' : field))
+          .join(' '),
+      );
+      const legalTargets = new Set(
+        legalTurn
+          .moves({ square: m.to, verbose: true })
+          .filter((move) => move.captured)
+          .map((move) => move.to),
+      );
+      const attacked = c
+        .board()
+        .flat()
+        .filter(
+          (p) =>
+            p &&
+            p.color !== mover &&
+            (p.type === 'k'
+              ? c.isCheck() && c.attackers(p.square, mover).includes(m.to)
+              : values[p.type] >= 3 && legalTargets.has(p.square)),
+        );
+      if (attacked.length >= 2)
+        out.push({
+          kind: 'fork',
+          root,
+          line: line.pv.slice(0, 8),
+          frames: [
+            {
+              ply: 1,
+              marks: attacked.map((p) => ({
+                kind: 'arrow',
+                from: m.to,
+                to: p!.square,
+                color: 'green',
+              })),
+            },
+          ],
+          verifiedDepth: line.depth,
+          facts: {
+            attacker: m.to,
+            targets: attacked.map((p) => p!.square).join(', '),
+            forcedWin: false,
+          },
+        });
+      // Absolute pin along a slider ray to the enemy king.
+      if (['b', 'r', 'q'].includes(m.piece)) {
+        const enemyKing = c
+          .board()
+          .flat()
+          .find((p) => p?.type === 'k' && p.color !== mover);
+        if (enemyKing) {
+          const x = m.to.charCodeAt(0),
+            y = Number(m.to[1]),
+            dx = enemyKing.square.charCodeAt(0) - x,
+            dy = Number(enemyKing.square[1]) - y;
+          const diagonal = Math.abs(dx) === Math.abs(dy),
+            straight = dx === 0 || dy === 0;
+          if ((diagonal && m.piece !== 'r') || (straight && m.piece !== 'b')) {
+            const sx = Math.sign(dx),
+              sy = Math.sign(dy);
+            const between: Square[] = [];
+            for (let k = 1; k < Math.max(Math.abs(dx), Math.abs(dy)); k++)
+              between.push(`${String.fromCharCode(x + k * sx)}${y + k * sy}` as Square);
+            const occupied = between.filter((s) => c.get(s));
+            if (occupied.length === 1 && c.get(occupied[0])?.color !== mover)
+              out.push({
+                kind: 'pin',
+                root,
+                line: line.pv.slice(0, 8),
+                frames: [
+                  {
+                    ply: 1,
+                    marks: [
+                      { kind: 'arrow', from: m.to, to: enemyKing.square, color: 'yellow' },
+                      { kind: 'square', square: occupied[0], color: 'red' },
+                    ],
+                  },
+                ],
+                verifiedDepth: line.depth,
+                facts: { piece: occupied[0], king: enemyKing.square },
+              });
+          }
+        }
+      }
+    }
+    if (index >= 3) gain = material(c, mover) - baseline;
+    if (c.isCheckmate() && c.turn() !== mover) {
+      out.push({
+        kind: 'mate',
+        root,
+        line: valid.slice(),
+        frames: frames.slice(),
+        verifiedDepth: line.depth,
+        facts: { plies: valid.length },
+      });
+      break;
+    }
+  }
+  if (valid.length >= 4 && gain >= 2)
+    out.push({
+      kind: 'material',
+      root,
+      line: valid,
+      frames,
+      verifiedDepth: line.depth,
+      facts: { gain },
+    });
+  return out;
+}
+export async function assessMove(
+  s: Study,
+  nodeId: string,
+  engine: EngineClient,
+  signal: AbortSignal,
+  depth = 12,
+  priority = 'review',
+): Promise<MoveAssessment> {
+  const n = s.nodes[nodeId];
+  if (!n?.parentId) throw Error('Select a move to assess');
+  const root = positionAt(s, n.parentId),
+    c = chessAt(s, n.parentId),
+    mover = c.turn(),
+    legal = c.moves({ verbose: true }).map((m) => m.from + m.to + (m.promotion || ''));
+  let sequence = 0;
+  const search = async (p: PositionInput, d: number, multiPv = 1, rootMoves?: string[]) =>
+    engine.analyze(
+      {
+        id: `${priority}:${s.id}:${nodeId}:${++sequence}`,
+        position: p,
+        budget: { kind: 'depth', depth: d },
+        multiPv,
+        rootMoves,
+      },
+      signal,
+    );
+  let result = await search(root, depth, Math.min(3, legal.length));
+  let best = result.lines[0],
+    second = result.lines[1];
+  if (!best?.pv[0]) throw Error('No legal reference move');
+  let played = result.lines.find((l) => l.pv[0] === n.uci);
+  if (!played) played = (await search(root, depth, 1, [n.uci!])).lines[0];
+  let evidence: Evidence[] = detectEvidence(root, played);
+  const provisional = classify({
+    nodeId,
+    mover,
+    playedUci: n.uci!,
+    book: isBook(n.fen),
+    legalCount: legal.length,
+    best,
+    played,
+    second,
+    evidence: [],
+  });
+  const after = chessAt(s, nodeId),
+    captures = after
+      .moves({ verbose: true })
+      .filter((m) => m.captured && m.to === n.uci!.slice(2, 4));
+  let sacrificeEndsInMate = false;
+  const materialDrop = (() => {
+    try {
+      const trial = chessFor(root);
+      played.pv.slice(0, 4).forEach((m) => trial.move(m));
+      sacrificeEndsInMate = trial.isCheckmate() && trial.turn() !== mover;
+      return material(c, mover) - material(trial, mover);
+    } catch {
+      return 0;
+    }
+  })();
+  const candidateSacrifice =
+    provisional.loss <= 0.01 &&
+    scoreExpected(played.score, mover) >= 0.4 &&
+    captures.length > 0 &&
+    materialDrop >= 2 &&
+    (played.pv.length >= 4 || sacrificeEndsInMate) &&
+    legal.length > 1;
+  const gap = second ? scoreExpected(best.score, mover) - scoreExpected(second.score, mover) : 0;
+  const candidateGreat = provisional.base === 'Best' && legal.length > 1 && gap >= 0.12;
+  const opportunities = detectEvidence(root, best).filter(
+    (e) => e.kind === 'mate' || e.kind === 'material',
+  );
+  const candidateMiss = provisional.loss > 0.03 && opportunities.length > 0;
+  if (candidateSacrifice || candidateGreat || candidateMiss) {
+    const verifyDepth = Math.max(18, depth + 2);
+    result = await search(root, verifyDepth, Math.min(3, legal.length));
+    best = result.lines[0];
+    second = result.lines[1];
+    played =
+      result.lines.find((l) => l.pv[0] === n.uci) ||
+      (await search(root, verifyDepth, 1, [n.uci!])).lines[0];
+    evidence = detectEvidence(root, played);
+    const p = scoreExpected(played.score, mover),
+      b = scoreExpected(best.score, mover);
+    if (candidateGreat && best.pv[0] === n.uci) {
+      const alternative = (
+        await search(
+          root,
+          verifyDepth,
+          1,
+          legal.filter((m) => m !== n.uci),
+        )
+      ).lines[0];
+      second = alternative;
+      const a = scoreExpected(alternative.score, mover);
+      if (b - a >= 0.12 && ((b >= 0.4 && a <= 0.25) || (b >= 0.75 && a <= 0.55)))
+        evidence.push({
+          kind: 'unique',
+          root,
+          line: best.pv,
+          frames: [],
+          verifiedDepth: verifyDepth,
+          facts: { gap: b - a },
+        });
+    }
+    if (candidateSacrifice && b - p <= 0.01 && p >= 0.4) {
+      let sound = true;
+      for (const capture of captures) {
+        const acceptance = (
+          await search(positionAt(s, nodeId), verifyDepth, 1, [
+            capture.from + capture.to + (capture.promotion || ''),
+          ])
+        ).lines[0];
+        if (scoreExpected(acceptance.score, mover) < 0.4) {
+          sound = false;
+          break;
+        }
+        const trial = chessAt(s, nodeId);
+        try {
+          acceptance.pv.slice(0, 3).forEach((m) => trial.move(m));
+        } catch {
+          sound = false;
+        }
+        if (material(c, mover) - material(trial, mover) < 2) sound = false;
+      }
+      if (sound)
+        evidence.push({
+          kind: 'sacrifice',
+          root,
+          line: played.pv,
+          frames: [
+            {
+              ply: 1,
+              marks: [{ kind: 'square', square: n.uci!.slice(2, 4) as Square, color: 'blue' }],
+            },
+          ],
+          verifiedDepth: verifyDepth,
+          facts: { material: materialDrop },
+        });
+    }
+    if (candidateMiss && b - p > 0.03) {
+      const winning = detectEvidence(root, best).find(
+        (e) => e.kind === 'mate' || e.kind === 'material',
+      );
+      const actual = detectEvidence(root, played).some((e) => e.kind === winning?.kind);
+      if (winning && !actual)
+        evidence.push({
+          ...winning,
+          kind: 'miss',
+          facts: { ...winning.facts, opportunity: winning.kind },
+        });
+    }
+  }
+  return classify({
+    nodeId,
+    mover,
+    playedUci: n.uci!,
+    book: isBook(n.fen),
+    legalCount: legal.length,
+    best,
+    played,
+    second,
+    evidence,
+  });
+}
+export function sanLine(root: PositionInput, pv: string[], limit = 8): string {
+  const c = chessFor(root),
+    out: string[] = [];
+  for (const uci of pv.slice(0, limit)) {
+    try {
+      const number = c.fen().split(' ')[5],
+        turn = c.turn();
+      const m = c.move(uci);
+      out.push(`${turn === 'w' ? number + '. ' : out.length === 0 ? number + '… ' : ''}${m.san}`);
+    } catch {
+      break;
+    }
+  }
+  return out.join(' ');
+}

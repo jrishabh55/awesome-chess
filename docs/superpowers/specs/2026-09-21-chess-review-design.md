@@ -192,4 +192,4 @@ Use the engine's advertised UCI_LimitStrength/UCI_Elo or Skill Level options to 
 
 ## Review status
 
-Approved by the user with “go” on 2026-09-21. Includes the complete review feature list, unlimited local-only operation, direct Analysis move feedback, sidelines, drawings, PWA support, and future teaching/play modules. This supersedes the earlier exclusion of Brilliant classification and game-rating estimates. Proceed to the written implementation plan; product implementation has not started.
+Approved by the user with “go” on 2026-09-21. Includes the complete review feature list, unlimited local-only operation, direct Analysis move feedback, sidelines, drawings, PWA support, and extension points for future teaching/play modules. This supersedes the earlier exclusion of Brilliant classification and game-rating estimates. Implementation and verification are complete; see [delivery notes](../../delivery.md) for results and limitations.
