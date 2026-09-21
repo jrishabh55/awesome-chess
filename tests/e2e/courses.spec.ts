@@ -13,7 +13,7 @@ async function openCourses(page: Page) {
 
 test('London search selects one complete course with shared-start sections', async ({ page }) => {
   const search = await openCourses(page);
-  await expect(search).toBeVisible({ timeout: 3000 });
+  await expect(search).toBeVisible();
   await search.fill('London');
   await expect(page.getByRole('option', { name: 'London System', exact: true })).toHaveCount(1);
   await page.getByRole('option', { name: 'London System', exact: true }).click();

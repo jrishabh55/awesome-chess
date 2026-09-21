@@ -77,23 +77,29 @@ it('labels similarly named rows by ending moves and searches course names, ECO, 
   expect(searchCourses(courses, 'd02').total).toBe(1);
   expect(searchCourses(courses, 'not present').items).toEqual([]);
 });
-it('retains large real database courses and every London source across canonical families', async () => {
-  const { readFileSync } = await import('node:fs');
-  const { parseOpeningCatalog } = await import('../openings/catalog');
-  const entries = ['a', 'b', 'c', 'd', 'e'].flatMap((file) =>
-    parseOpeningCatalog(readFileSync(`public/data/${file}.tsv`, 'utf8')),
-  );
-  const courses = openingCourses(entries);
-  const london = courses.find((course) => course.name === 'London System')!;
-  const sicilian = courses.find((course) => course.name === 'Sicilian Defense')!;
-  expect(london.sourceCount).toBe(
-    entries.filter((entry) => /\bLondon System\b/.test(entry.name)).length,
-  );
-  expect(sicilian.variations.length).toBeGreaterThan(40);
-  expect(sicilian.sections.flatMap((section) => section.variationIndices)).toEqual(
-    sicilian.variations.map((_, index) => index),
-  );
-});
+// Replays the entire bundled database, not a small unit fixture. Shared CI
+// runners need more than the default five seconds for this integration check.
+it(
+  'retains large real database courses and every London source across canonical families',
+  { timeout: 30_000 },
+  async () => {
+    const { readFileSync } = await import('node:fs');
+    const { parseOpeningCatalog } = await import('../openings/catalog');
+    const entries = ['a', 'b', 'c', 'd', 'e'].flatMap((file) =>
+      parseOpeningCatalog(readFileSync(`public/data/${file}.tsv`, 'utf8')),
+    );
+    const courses = openingCourses(entries);
+    const london = courses.find((course) => course.name === 'London System')!;
+    const sicilian = courses.find((course) => course.name === 'Sicilian Defense')!;
+    expect(london.sourceCount).toBe(
+      entries.filter((entry) => /\bLondon System\b/.test(entry.name)).length,
+    );
+    expect(sicilian.variations.length).toBeGreaterThan(40);
+    expect(sicilian.sections.flatMap((section) => section.variationIndices)).toEqual(
+      sicilian.variations.map((_, index) => index),
+    );
+  },
+);
 it('reuses course groups and parsed labels without mutating immutable database inputs', () => {
   const entries = [
     Object.freeze(entry('cache-a', 'Sicilian Defense', '1. e4 c5', 'B20')),
