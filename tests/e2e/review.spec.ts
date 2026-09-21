@@ -64,5 +64,40 @@ test('paused engine never shows stale lines on another position', async ({ page 
   await page.getByRole('switch', { name: 'Engine analysis' }).click();
   await page.getByRole('button', { name: 'Go to start', exact: true }).click();
   await expect(page.locator('.engine-line')).toHaveCount(0);
-  await expect(page.locator('.board-overlay line')).toHaveCount(0);
+  await expect(page.locator('.annotation-arrow')).toHaveCount(0);
+});
+
+test('engine arrows settle after navigation and pending suggestions stop when paused', async ({
+  page,
+}) => {
+  await page.goto('./');
+  await page.getByRole('button', { name: 'Engine settings', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Engine build' }).selectOption('lite');
+  await page.getByRole('button', { name: 'Close dialog' }).click();
+  const arrow = page.locator('.annotation-arrow');
+  await expect(arrow).toHaveCount(1, { timeout: 90000 });
+  // Observe every frame: an old arrow must vanish, and an early candidate must not flash.
+  const frames = await page.evaluate(async () => {
+    (document.querySelector('[aria-label="Go to start"]') as HTMLButtonElement).click();
+    const counts: number[] = [];
+    const start = performance.now();
+    while (performance.now() - start < 350) {
+      await new Promise(requestAnimationFrame);
+      counts.push(document.querySelectorAll('.annotation-arrow').length);
+    }
+    return counts;
+  });
+  expect(frames.length).toBeGreaterThan(0);
+  expect(frames.every((count) => count === 0)).toBe(true);
+  await expect(arrow).toHaveCount(1);
+  // Move through several positions faster than the stabilization delay.
+  for (let i = 0; i < 3; i++) {
+    await page.getByRole('button', { name: 'Next move', exact: true }).click();
+    await expect(arrow).toHaveCount(0);
+  }
+  await page.getByRole('switch', { name: 'Engine analysis' }).click();
+  await page.waitForTimeout(750);
+  await expect(arrow).toHaveCount(0);
+  await page.getByRole('switch', { name: 'Engine analysis' }).click();
+  await expect(arrow).toHaveCount(1);
 });

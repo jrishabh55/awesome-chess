@@ -46,6 +46,7 @@ import {
   pathTo,
 } from '../chess/tree';
 import { Board } from '../board/Board';
+import { useStableEngineMove } from '../board/use-stable-engine-move';
 import { samplePgn } from './sample';
 import { prepareWorker, type EngineLoadState } from '../engine/prepare-worker';
 import { ENGINE_BUILD_ID } from '../engine/build';
@@ -583,13 +584,25 @@ export default function App() {
     lastMove = demo.index ? demo.line[demo.index - 1] : null;
     coachMarks = demo.frames.find((f) => f.ply === demo.index)?.marks || [];
   }
-  const displayResult =
-    result?.positionKey ===
-    positionKey(positionAt(study, study.selectedId), engine.engineId, `${flavor}:full-strength`)
-      ? result
-      : null;
+  const currentPositionKey = positionKey(
+    positionAt(study, study.selectedId),
+    engine.engineId,
+    `${flavor}:full-strength`,
+  );
+  const displayResult = result?.positionKey === currentPositionKey ? result : null;
   const hideHints = Boolean(retry && !retry.revealed);
-  const bestMove = displayResult?.lines[0]?.pv[0];
+  const bestMove = useStableEngineMove(
+    JSON.stringify([
+      study.id,
+      study.selectedId,
+      currentPositionKey,
+      depth,
+      engineGeneration,
+      infinite,
+    ]),
+    displayResult?.lines[0]?.pv[0],
+    engineOn && showArrow && !retry && !demo && !reviewing && engineLoad.phase !== 'error',
+  );
   const engineMarks: Mark[] =
     showArrow && bestMove && !retry && !demo
       ? [
