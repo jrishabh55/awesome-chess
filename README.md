@@ -11,7 +11,7 @@ A local-first chess review PWA with Stockfish 19, a playable analysis board, bra
 - Stockfish 19 runs locally in a Web Worker, with full and lightweight builds, three best lines, signed evaluations, and mate scores.
 - Unlimited game reviews with all ten move classifications, accuracy for both players, approximate performance ratings, and opening/middlegame/endgame reports.
 - Playable sidelines, PGN variations, legal move indicators, board flipping, promotion, colored arrows, and square highlights.
-- Local coach explanations, guided key moments, retry exercises, and a clickable evaluation timeline.
+- Local coach explanations, guided key moments, retry exercises, and visual tactical explanations.
 - Opening names and ECO codes from the Lichess opening database.
 - Local study library, PGN/FEN import, PGN export, JSON backups, and an installable offline PWA.
 
@@ -25,9 +25,9 @@ npm run prepare:assets
 npm run dev
 ```
 
-Open the URL printed by Vite. Asset preparation downloads the pinned Lichess opening database and prepares the engine from the pinned npm package. The full Stockfish engine is about 95 MB; the optional Lite build is about 1.7 MB. Assets are served from this project, not a runtime CDN.
+Open the URL printed by Vite. Asset preparation downloads the pinned Lichess opening database and prepares the engine from the pinned npm package. Engine startup shows download progress, verifies and caches the files, and offers retry after a failure. The full Stockfish engine is about 95 MB; the optional Lite build is about 1.7 MB. Assets are served from this project, not a runtime CDN.
 
-On the hosted site, the full engine's first download can take several minutes on a slower connection. Choose **Settings → Engine build → Lite** for a faster start, or use **Make available offline** to download and verify the full engine with visible progress. Once saved offline, it does not need to download again for each visit.
+On the hosted site, the full engine's first download can take several minutes on a slower connection. The loading panel lets you switch to Lite without waiting. Choose **Settings → Engine build → Lite** for a faster start, or use **Make available offline** to download and verify the full engine with visible progress. Once saved offline, it does not need to download again for each visit.
 
 For the installable/offline app:
 
@@ -41,9 +41,9 @@ Open `http://127.0.0.1:5174`, choose **Settings → Make available offline**, an
 ## Use
 
 - **Import game:** paste PGN/FEN or upload PGN/JSON. Multi-game PGNs present a chooser; JSON backups restore every study and preserve conflicting local games as copies.
-- **Review game:** analyzes the original mainline. Both players get accuracy, classification counts, an evaluation graph, phase reports, and an approximate performance estimate when there are enough meaningful decisions.
+- **Review game:** analyzes the original mainline. Quick review (the default) uses time-limited searches; Deep review uses the selected depth. Live analysis pauses during a review, and restarting an incomplete review resumes completed moves at the same settings. Both players get accuracy, classification counts, phase reports, and an approximate performance estimate when there are enough meaningful decisions.
 - **Analysis:** shows three engine continuations and move-quality feedback. Play a different move from any position to create a sideline. Click a continuation to add it to the tree. Return to game restores the exploration origin.
-- **Board drawings:** right-click to highlight; right-drag to draw arrows. Use the visible tools on touch devices or select squares with keyboard focus and Enter. Drawings are stored with the position in the study.
+- **Board drawings:** plain right-click clears existing arrows/highlights, or adds a yellow highlight when none are visible. Ctrl + right-click adds a red highlight. Right-drag draws smooth arrows; knight moves use an L-shaped arrow. Use the visible tools on touch devices or select squares with keyboard focus and Enter. Drawings are stored with the position in the study.
 - **Coach:** explains verified local evidence, shows continuations and tactical overlays, and navigates key moments.
 - **Retry:** hides answers while you try a better move. Hint/reveal are optional. A sound equivalent move can pass. Save an attempt as a sideline explicitly.
 - **Library:** reopen local games, export PGN with variations/comments/drawings, or create a lossless JSON backup. Settings also offers FEN copy and per-study backup.
@@ -85,7 +85,7 @@ VITE_BASE_PATH=/awesome-chess/ npm run preview -- --port 5174
 TEST_URL=http://127.0.0.1:5174/awesome-chess/ npm run test:e2e
 ```
 
-Offline use requires one successful visit and **Settings → Make available offline**. Reviews have no daily quota. Work remains on your device, including when the app is opened from GitHub Pages.
+Offline use requires one successful visit, the app shell to finish caching, and the automatic engine download to finish. **Settings → Make available offline** lets you verify the selected engine again. Reviews have no daily quota. Work remains on your device, including when the app is opened from GitHub Pages.
 
 ## Source and licenses
 

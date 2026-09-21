@@ -218,6 +218,7 @@ export async function assessMove(
   signal: AbortSignal,
   depth = 12,
   priority = 'review',
+  speed: 'quick' | 'deep' = 'deep',
 ): Promise<MoveAssessment> {
   const n = s.nodes[nodeId];
   if (!n?.parentId) throw Error('Select a move to assess');
@@ -226,12 +227,16 @@ export async function assessMove(
     mover = c.turn(),
     legal = c.moves({ verbose: true }).map((m) => m.from + m.to + (m.promotion || ''));
   let sequence = 0;
+  let verificationSearch = false;
   const search = async (p: PositionInput, d: number, multiPv = 1, rootMoves?: string[]) =>
     engine.analyze(
       {
         id: `${priority}:${s.id}:${nodeId}:${++sequence}`,
         position: p,
-        budget: { kind: 'depth', depth: d },
+        budget:
+          speed === 'quick'
+            ? { kind: 'time', milliseconds: verificationSearch ? 900 : 250 }
+            : { kind: 'depth', depth: d },
         multiPv,
         rootMoves,
       },
@@ -284,6 +289,7 @@ export async function assessMove(
   );
   const candidateMiss = provisional.loss > 0.03 && opportunities.length > 0;
   if (candidateSacrifice || candidateGreat || candidateMiss) {
+    verificationSearch = true;
     const verifyDepth = Math.max(18, depth + 2);
     result = await search(root, verifyDepth, Math.min(3, legal.length));
     best = result.lines[0];
@@ -294,7 +300,8 @@ export async function assessMove(
     evidence = detectEvidence(root, played);
     const p = scoreExpected(played.score, mover),
       b = scoreExpected(best.score, mover);
-    if (candidateGreat && best.pv[0] === n.uci) {
+    const verified = best.depth >= 18 && played.depth >= 18;
+    if (verified && candidateGreat && best.pv[0] === n.uci) {
       const alternative = (
         await search(
           root,
@@ -305,25 +312,31 @@ export async function assessMove(
       ).lines[0];
       second = alternative;
       const a = scoreExpected(alternative.score, mover);
-      if (b - a >= 0.12 && ((b >= 0.4 && a <= 0.25) || (b >= 0.75 && a <= 0.55)))
+      if (
+        alternative.depth >= 18 &&
+        b - a >= 0.12 &&
+        ((b >= 0.4 && a <= 0.25) || (b >= 0.75 && a <= 0.55))
+      )
         evidence.push({
           kind: 'unique',
           root,
           line: best.pv,
           frames: [],
-          verifiedDepth: verifyDepth,
+          verifiedDepth: Math.min(best.depth, played.depth, alternative.depth),
           facts: { gap: b - a },
         });
     }
-    if (candidateSacrifice && b - p <= 0.01 && p >= 0.4) {
+    if (verified && candidateSacrifice && b - p <= 0.01 && p >= 0.4) {
       let sound = true;
+      let sacrificeDepth = Math.min(best.depth, played.depth);
       for (const capture of captures) {
         const acceptance = (
           await search(positionAt(s, nodeId), verifyDepth, 1, [
             capture.from + capture.to + (capture.promotion || ''),
           ])
         ).lines[0];
-        if (scoreExpected(acceptance.score, mover) < 0.4) {
+        sacrificeDepth = Math.min(sacrificeDepth, acceptance.depth);
+        if (acceptance.depth < 18 || scoreExpected(acceptance.score, mover) < 0.4) {
           sound = false;
           break;
         }
@@ -346,11 +359,11 @@ export async function assessMove(
               marks: [{ kind: 'square', square: n.uci!.slice(2, 4) as Square, color: 'blue' }],
             },
           ],
-          verifiedDepth: verifyDepth,
+          verifiedDepth: sacrificeDepth,
           facts: { material: materialDrop },
         });
     }
-    if (candidateMiss && b - p > 0.03) {
+    if (verified && candidateMiss && b - p > 0.03) {
       const winning = detectEvidence(root, best).find(
         (e) => e.kind === 'mate' || e.kind === 'material',
       );

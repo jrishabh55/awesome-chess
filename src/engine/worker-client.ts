@@ -20,11 +20,13 @@ export class EngineClient {
   private queue: Job[] = [];
   private running = false;
   private dead = false;
+  private lifetime = new AbortController();
   private fault: ((error: Error) => void) | null = null;
   engineId = 'Stockfish 19';
   constructor(
     public flavor: EngineFlavor = 'full',
-    private factory: (url: string) => Worker = (url) => new Worker(url),
+    private factory: (url: string, signal: AbortSignal) => Worker | Promise<Worker> = (url) =>
+      new Worker(url),
   ) {}
   private send(s: string) {
     this.worker?.postMessage(s);
@@ -58,7 +60,11 @@ export class EngineClient {
   private initialize() {
     if (this.ready) return this.ready;
     this.ready = (async () => {
-      this.worker = this.factory(engineUrl(this.flavor));
+      this.worker = await this.factory(engineUrl(this.flavor), this.lifetime.signal);
+      if (this.dead) {
+        this.worker.terminate();
+        throw abortError();
+      }
       this.worker.onmessage = (event) => {
         for (const line of String(event.data).split('\n')) {
           if (line.startsWith('id name ')) this.engineId = line.slice(8);
@@ -157,6 +163,7 @@ export class EngineClient {
       const lines = new Map<number, EngineLine>();
       const depths = new Map<number, Map<number, EngineLine>>();
       let complete: EngineLine[] = [];
+      let lastUpdate = 0;
       const required = Math.min(r.multiPv, r.rootMoves?.length || c.moves().length);
       let stopTimer: ReturnType<typeof setTimeout> | undefined;
       const maxWait =
@@ -203,16 +210,19 @@ export class EngineClient {
             )
               complete = ordered;
           }
-          update?.(
-            result(
-              complete.length
-                ? complete
-                : [...lines.values()]
-                    .filter((l) => l.depth === line.depth)
-                    .sort((a, b) => a.rank - b.rank),
-              false,
-            ),
-          );
+          if (performance.now() - lastUpdate >= 100) {
+            lastUpdate = performance.now();
+            update?.(
+              result(
+                complete.length
+                  ? complete
+                  : [...lines.values()]
+                      .filter((l) => l.depth === line.depth)
+                      .sort((a, b) => a.rank - b.rank),
+                false,
+              ),
+            );
+          }
         }
       };
       const fail = (e: Error) => {
@@ -252,6 +262,7 @@ export class EngineClient {
   }
   dispose() {
     this.dead = true;
+    this.lifetime.abort();
     this.fault?.(abortError());
     this.worker?.terminate();
     this.worker = null;

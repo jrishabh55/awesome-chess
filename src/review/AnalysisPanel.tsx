@@ -1,3 +1,4 @@
+import { MoveQualityIcon } from '../ui/MoveQualityIcon';
 import { ArrowUpRight, ChevronRight, Activity } from 'lucide-react';
 import type { PositionInput, Study } from '../chess/types';
 import type { AnalysisResult } from '../engine/types';
@@ -64,7 +65,7 @@ export function AnalysisPanel({
               className="classification-icon"
               style={{ background: labelInfo[assessment.primary].color }}
             >
-              {labelInfo[assessment.primary].symbol}
+              <MoveQualityIcon label={assessment.primary} />
             </span>
             <div>
               <strong>

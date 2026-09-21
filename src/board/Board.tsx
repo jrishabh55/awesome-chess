@@ -1,8 +1,11 @@
 import { assetUrl } from '../app/asset-url';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Chess } from 'chess.js';
 import type { Color, Square, Mark, DrawingColor } from '../chess/types';
 import { pointToSquare, squareToPoint } from './coordinates';
+import { MoveQualityIcon } from '../ui/MoveQualityIcon';
+import { arrowPath, type Point } from './geometry';
+import { reconcilePieces } from './pieces';
 import { labelInfo, type Label } from '../review/policy';
 const hues = { green: '#71b448', red: '#e56464', blue: '#57a1de', yellow: '#ebbd42' };
 const pieceNames: Record<string, string> = {
@@ -22,6 +25,7 @@ interface Props {
   coachMarks?: Mark[];
   onMove: (uci: string) => void;
   onToggleMark: (mark: Mark) => void;
+  onClearMarks: () => void;
   drawingMode: 'move' | 'arrow' | 'square';
   drawingColor: DrawingColor;
   disabled?: boolean;
@@ -37,6 +41,7 @@ export function Board({
   coachMarks = [],
   onMove,
   onToggleMark,
+  onClearMarks,
   drawingMode,
   drawingColor,
   disabled,
@@ -44,14 +49,35 @@ export function Board({
   hideHints,
 }: Props) {
   const boardRef = useRef<HTMLDivElement>(null);
-  const gesture = useRef<{ from: Square; draw: boolean; x: number; y: number } | null>(null);
+  const gesture = useRef<{
+    from: Square;
+    draw: boolean;
+    x: number;
+    y: number;
+    color: DrawingColor;
+    right: boolean;
+    ctrl: boolean;
+  } | null>(null);
+  const frame = useRef<number | null>(null);
+  const [pointer, setPointer] = useState<Point | null>(null);
+  const [hideAutomatic, setHideAutomatic] = useState(false);
+  const [pieces, setPieces] = useState(() => reconcilePieces([], fen));
+  useLayoutEffect(() => setPieces((old) => reconcilePieces(old, fen)), [fen]);
+  useEffect(
+    () => () => {
+      if (frame.current !== null) cancelAnimationFrame(frame.current);
+    },
+    [],
+  );
   const [selected, setSelected] = useState<Square | null>(null);
   const [preview, setPreview] = useState<Square | null>(null);
   const [promotion, setPromotion] = useState<{ from: Square; to: Square } | null>(null);
-  const chess = new Chess(fen);
+  const chess = useMemo(() => new Chess(fen), [fen]);
   useEffect(() => {
     setSelected(null);
     setPreview(null);
+    setPointer(null);
+    setHideAutomatic(false);
     setPromotion(null);
     gesture.current = null;
   }, [fen, orientation, drawingMode]);
@@ -61,7 +87,10 @@ export function Board({
       ? pointToSquare(((x - b.left) / b.width) * 8, ((y - b.top) / b.height) * 8, orientation)
       : null;
   };
-  const legal = selected ? chess.moves({ square: selected, verbose: true }) : [];
+  const legal = useMemo(
+    () => (selected ? chess.moves({ square: selected, verbose: true }) : []),
+    [chess, selected],
+  );
   const move = (from: Square, to: Square) => {
     if (disabled) return;
     const candidates = chess.moves({ square: from, verbose: true }).filter((m) => m.to === to);
@@ -87,9 +116,23 @@ export function Board({
     if (selected && selected !== square) move(selected, square);
     else setSelected(chess.get(square)?.color === chess.turn() ? square : null);
   };
-  const allMarks = [...(hideHints ? [] : marks), ...(!hideHints ? engineMarks : []), ...coachMarks];
-  if (gesture.current?.draw && preview && preview !== gesture.current.from)
-    allMarks.push({ kind: 'arrow', from: gesture.current.from, to: preview, color: drawingColor });
+  const allMarks = [
+    ...(hideHints ? [] : marks),
+    ...(!hideHints && !hideAutomatic ? engineMarks : []),
+    ...(!hideAutomatic ? coachMarks : []),
+  ];
+  const clearDrawings = () => {
+    onClearMarks();
+    setHideAutomatic(true);
+    setSelected(null);
+  };
+  const finishGesture = () => {
+    if (frame.current !== null) cancelAnimationFrame(frame.current);
+    frame.current = null;
+    gesture.current = null;
+    setPreview(null);
+    setPointer(null);
+  };
   return (
     <div className="board-frame">
       <div
@@ -104,34 +147,58 @@ export function Board({
           if (!from) return;
           gesture.current = {
             from,
-            draw: e.button === 2 || drawingMode !== 'move',
+            draw: e.button === 2 || e.ctrlKey || drawingMode !== 'move',
             x: e.clientX,
             y: e.clientY,
+            color: e.ctrlKey ? 'red' : drawingColor,
+            right: e.button === 2 || e.ctrlKey,
+            ctrl: e.ctrlKey,
           };
+          if (!gesture.current.draw && chess.get(from)?.color === chess.turn()) setSelected(from);
           e.currentTarget.setPointerCapture(e.pointerId);
         }}
         onPointerMove={(e) => {
-          if (gesture.current) setPreview(squareAt(e.clientX, e.clientY));
+          const g = gesture.current,
+            bounds = boardRef.current?.getBoundingClientRect();
+          if (!g || !bounds || Math.hypot(e.clientX - g.x, e.clientY - g.y) <= 4) return;
+          const point = {
+            x: Math.max(0, Math.min(8, ((e.clientX - bounds.left) / bounds.width) * 8)),
+            y: Math.max(0, Math.min(8, ((e.clientY - bounds.top) / bounds.height) * 8)),
+          };
+          const target = squareAt(e.clientX, e.clientY);
+          if (frame.current !== null) cancelAnimationFrame(frame.current);
+          frame.current = requestAnimationFrame(() => {
+            setPointer(point);
+            setPreview(target);
+            frame.current = null;
+          });
         }}
         onPointerCancel={() => {
-          gesture.current = null;
-          setPreview(null);
+          finishGesture();
           setSelected(null);
+        }}
+        onLostPointerCapture={() => {
+          if (gesture.current) finishGesture();
         }}
         onPointerUp={(e) => {
           const g = gesture.current;
           if (!g) return;
           const to = squareAt(e.clientX, e.clientY);
-          gesture.current = null;
-          setPreview(null);
+          finishGesture();
           if (!to) return;
           const dragged = Math.hypot(e.clientX - g.x, e.clientY - g.y) > 6;
           if (g.draw) {
             if (dragged && g.from !== to) {
-              onToggleMark({ kind: 'arrow', from: g.from, to, color: drawingColor });
+              onToggleMark({ kind: 'arrow', from: g.from, to, color: g.color });
               setSelected(null);
-            } else if (e.button === 2 || drawingMode === 'square') {
-              onToggleMark({ kind: 'square', square: to, color: drawingColor });
+            } else if (g.right && !g.ctrl && allMarks.length) {
+              clearDrawings();
+            } else if (g.right || drawingMode === 'square') {
+              onToggleMark({
+                kind: 'square',
+                square: to,
+                color: g.ctrl ? 'red' : g.right ? 'yellow' : g.color,
+              });
             } else activate(to, true);
           } else if (dragged && g.from !== to) move(g.from, to);
           else activate(to);
@@ -162,24 +229,52 @@ export function Board({
             >
               {col === 0 && <span className="rank-label">{square[1]}</span>}
               {row === 7 && <span className="file-label">{square[0]}</span>}
-              {piece && (
-                <img
-                  src={assetUrl(`assets/pieces/${piece.color}${piece.type.toUpperCase()}.svg`)}
-                  alt=""
-                  draggable={false}
-                />
-              )}
               {legal.some((m) => m.to === square) && (
                 <span className={piece ? 'legal capture' : 'legal'} />
               )}
               {!hideHints && badge && lastMove?.slice(2, 4) === square && (
-                <span className="board-badge" style={{ background: labelInfo[badge].color }}>
-                  {labelInfo[badge].symbol}
+                <span
+                  className="board-badge"
+                  role="img"
+                  aria-label={`${badge} move`}
+                  title={badge}
+                  style={{ background: labelInfo[badge].color }}
+                >
+                  <MoveQualityIcon label={badge} size={18} />
                 </span>
               )}
             </button>
           );
         })}
+        <div className="piece-layer" aria-hidden="true">
+          {pieces.map((piece) => {
+            const position = squareToPoint(piece.square, orientation);
+            const dragging =
+              pointer &&
+              gesture.current &&
+              !gesture.current.draw &&
+              gesture.current.from === piece.square &&
+              piece.color === chess.turn() &&
+              !disabled;
+            const point = dragging ? pointer : position;
+            return (
+              <div
+                key={piece.id}
+                data-piece={piece.square}
+                className={`board-piece ${dragging ? 'dragging' : ''}`}
+                style={{
+                  transform: `translate(${(point.x - 0.5) * 100}%, ${(point.y - 0.5) * 100}%)`,
+                }}
+              >
+                <img
+                  src={assetUrl(`assets/pieces/${piece.color}${piece.type.toUpperCase()}.svg`)}
+                  alt=""
+                  draggable={false}
+                />
+              </div>
+            );
+          })}
+        </div>
         <svg className="board-overlay" viewBox="0 0 8 8" aria-hidden="true">
           <defs>
             {Object.entries(hues).map(([key, color]) => (
@@ -215,20 +310,37 @@ export function Board({
             const a = squareToPoint(mark.from, orientation),
               b = squareToPoint(mark.to, orientation);
             return (
-              <line
+              <path
+                className="annotation-arrow"
                 key={i}
-                x1={a.x}
-                y1={a.y}
-                x2={b.x}
-                y2={b.y}
+                d={arrowPath(a, b)}
+                fill="none"
                 stroke={hues[mark.color]}
                 strokeWidth=".14"
                 opacity=".85"
                 strokeLinecap="round"
+                strokeLinejoin="round"
                 markerEnd={`url(#arrow-${mark.color})`}
               />
             );
           })}
+          {gesture.current?.draw && pointer && preview && preview !== gesture.current.from && (
+            <path
+              className="drawing-preview"
+              d={arrowPath(
+                squareToPoint(gesture.current.from, orientation),
+                pointer,
+                squareToPoint(preview, orientation),
+              )}
+              fill="none"
+              stroke={hues[gesture.current.color]}
+              strokeWidth=".14"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity=".8"
+              markerEnd={`url(#arrow-${gesture.current.color})`}
+            />
+          )}
         </svg>
       </div>
       {promotion && (

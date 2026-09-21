@@ -3,23 +3,29 @@ import type { Study, Color } from '../chess/types';
 import type { MoveAssessment, Label } from './policy';
 import { labels, labelInfo } from './policy';
 import { buildReport, type Phase } from './report';
-import { EvaluationGraph } from './EvaluationGraph';
+import { MoveQualityIcon } from '../ui/MoveQualityIcon';
 export function ReviewPanel({
   study,
   assessments,
   reviewing,
+  completed,
   onReview,
   onStop,
   onSelect,
   onGuide,
+  speed,
+  onSpeed,
 }: {
   study: Study;
   assessments: Record<string, MoveAssessment>;
   reviewing: boolean;
+  completed: number;
   onReview: () => void;
   onStop: () => void;
   onSelect: (id: string) => void;
   onGuide: () => void;
+  speed: 'quick' | 'deep';
+  onSpeed: (speed: 'quick' | 'deep') => void;
 }) {
   const r = buildReport(study, assessments),
     done = r.w.analyzed + r.b.analyzed,
@@ -49,17 +55,33 @@ export function ReviewPanel({
           </div>
         ))}
       </div>
-      <EvaluationGraph study={study} assessments={assessments} onSelect={onSelect} />
+      <label className="review-speed">
+        <span>Review speed</span>
+        <select
+          aria-label="Review speed"
+          value={speed}
+          disabled={reviewing}
+          onChange={(e) => onSpeed(e.target.value as 'quick' | 'deep')}
+        >
+          <option value="quick">Quick · time-limited</option>
+          <option value="deep">Deep · selected depth</option>
+        </select>
+      </label>
+      <p className="review-speed-note">
+        {speed === 'quick'
+          ? 'Fast feedback first. Special labels appear only when deeper checks confirm them.'
+          : 'More calculation per move. Complex positions can take longer.'}
+      </p>
       <div className="review-action">
         {reviewing ? (
           <>
             <div className="progress-track">
-              <div style={{ width: `${total ? (done / total) * 100 : 0}%` }} />
+              <div style={{ width: `${total ? (completed / total) * 100 : 0}%` }} />
             </div>
             <button className="primary" onClick={onStop}>
               <Square size={15} /> Stop review{' '}
               <span>
-                {done}/{total}
+                {completed}/{total}
               </span>
             </button>
           </>
@@ -72,9 +94,11 @@ export function ReviewPanel({
         )}
         <span className="local-note">
           <ShieldCheck size={13} />
-          {done < total && done > 0
-            ? `Provisional · ${done} of ${total} moves analyzed`
-            : 'On your device. Always unlimited.'}
+          {reviewing
+            ? `Reviewing ${completed} of ${total} moves`
+            : done < total && done > 0
+              ? `Provisional · ${done} of ${total} moves analyzed`
+              : 'On your device. Always unlimited.'}
         </span>
       </div>
       {done > 0 && (
@@ -98,7 +122,9 @@ export function ReviewPanel({
                   {r.w.counts[l]}
                 </button>
                 <span>
-                  <b style={{ color: labelInfo[l].color }}>{labelInfo[l].symbol}</b>
+                  <b style={{ color: labelInfo[l].color }}>
+                    <MoveQualityIcon label={l} />
+                  </b>
                   {l}
                 </span>
                 <button

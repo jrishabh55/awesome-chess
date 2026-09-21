@@ -1,3 +1,4 @@
+import { MoveQualityIcon } from '../ui/MoveQualityIcon';
 import {
   GraduationCap,
   RotateCcw,
@@ -46,7 +47,7 @@ export function CoachCard({
       </div>
       <h3>
         <span style={{ color: labelInfo[assessment.primary].color }}>
-          {labelInfo[assessment.primary].symbol}
+          <MoveQualityIcon label={assessment.primary} />
         </span>{' '}
         {san} · {assessment.primary}
       </h3>

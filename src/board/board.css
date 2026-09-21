@@ -186,3 +186,47 @@
     top: -1px;
   }
 }
+
+.piece-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+.board-piece {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 12.5%;
+  height: 12.5%;
+  display: grid;
+  place-items: center;
+  transition: transform 190ms cubic-bezier(0.2, 0.75, 0.3, 1);
+  will-change: transform;
+}
+.board-piece img {
+  width: 87%;
+  height: 87%;
+  filter: drop-shadow(0 2px 1px #0003);
+  pointer-events: none;
+}
+.board-piece.dragging {
+  transition: none;
+  z-index: 10;
+  filter: drop-shadow(0 7px 4px #0005);
+}
+.square {
+  cursor: pointer;
+}
+.board-badge {
+  width: clamp(24px, 3vw, 32px);
+  height: clamp(24px, 3vw, 32px);
+  top: 2px;
+  right: 2px;
+  border-width: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .board-piece {
+    transition: none;
+  }
+}

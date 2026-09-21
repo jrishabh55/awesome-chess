@@ -58,3 +58,41 @@ it('demonstrates legal mate instead of only trusting the score', () => {
   );
   expect(e.find((x) => x.kind === 'mate')?.facts.plies).toBe(1);
 });
+
+it.each([12, 20])(
+  'quick reviews at depth %i bound search time and do not claim unverified deep labels',
+  async (depth) => {
+    const { assessMove } = await import('./classify');
+    const { parsePgn } = await import('../chess/tree');
+    const requests: import('../engine/types').AnalyzeRequest[] = [];
+    const fake = {
+      analyze: async (request: import('../engine/types').AnalyzeRequest) => {
+        requests.push(request);
+        return {
+          lines: [
+            { ...line(400, ['e2e4']), depth: 10 },
+            { ...line(-200, ['d2d4']), depth: 10, rank: 2 },
+            { ...line(-250, ['g1f3']), depth: 10, rank: 3 },
+          ],
+        };
+      },
+    } as unknown as import('../engine/worker-client').EngineClient;
+    const study = parsePgn('1. e4 *')[0];
+    const result = await assessMove(
+      study,
+      study.mainline[0],
+      fake,
+      new AbortController().signal,
+      depth,
+      'review',
+      'quick',
+    );
+    expect(requests.map((r) => r.budget)).toEqual([
+      { kind: 'time', milliseconds: 250 },
+      { kind: 'time', milliseconds: 900 },
+    ]);
+    expect(result.primary).not.toBe('Great');
+    expect(result.depth).toBe(10);
+    expect(result.evidence.some((e) => e.kind === 'unique')).toBe(false);
+  },
+);

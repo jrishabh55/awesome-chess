@@ -35,3 +35,7 @@ Let A be accuracy across these decisions and C their average critical-gap contri
 Phases advance from opening to middlegame to endgame using opening recognition, development, castling rights, and material. Endgame begins with total non-pawn/non-king material ≤ 13, or ≤ 20 with both queens absent. Opening ends by ply 24, or sooner once development or the end of recognized theory warrants it. Phases never move backward after a promotion. A phase not reached is distinguished from one awaiting analysis.
 
 Coach text comes from structured local evidence. Specific fork, pin, material, sacrifice, and mate demonstrations must have a legally replayable continuation. Unknown ideas receive factual move/evaluation feedback rather than invented prose.
+
+## Quick and Deep review
+
+Quick review is the default: each base search has a 250 ms budget and special-label verification searches have a 900 ms budget. The engine remains at full strength. Actual completed search depth is recorded; Brilliant, Great, and Miss require verification that reaches at least depth 18, including relevant alternative/acceptance searches. A Quick review may therefore retain an ordinary label where Deep review later confirms a special label. Deep review uses the chosen search depth and deeper verification without these short time budgets. Live analysis pauses during review so it does not compete for the same worker.

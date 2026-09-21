@@ -1,3 +1,4 @@
+import { MoveQualityIcon } from '../ui/MoveQualityIcon';
 import { useEffect, useRef } from 'react';
 import type { Study, GameNode } from '../chess/types';
 import { labelInfo, type MoveAssessment } from './policy';
@@ -38,7 +39,7 @@ export function MoveList({
             style={{ color: labelInfo[a.primary].color }}
             aria-label={a.primary}
           >
-            {labelInfo[a.primary].symbol}
+            <MoveQualityIcon label={a.primary} size={16} />
           </span>
         )}
       </button>

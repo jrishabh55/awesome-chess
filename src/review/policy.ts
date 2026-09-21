@@ -55,6 +55,7 @@ export interface MoveAssessment {
   evidence: Evidence[];
   depth: number;
   policyVersion: 1;
+  reviewProfile?: string;
   meaningful: boolean;
   criticalGap: number;
   before: Score;

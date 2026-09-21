@@ -5,7 +5,11 @@ test('bundled assets and PWA URLs stay within the deployment path', async ({ pag
   const base = new URL(baseURL!);
   page.on('request', (request) => {
     const url = new URL(request.url());
-    if (url.origin === base.origin && !url.pathname.startsWith(base.pathname))
+    if (
+      url.protocol !== 'blob:' &&
+      url.origin === base.origin &&
+      !url.pathname.startsWith(base.pathname)
+    )
       outside.push(url.pathname);
   });
   await page.goto('./');

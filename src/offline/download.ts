@@ -41,10 +41,12 @@ export async function downloadAssetSet(
     assets = m.assets.filter((a) => a.flavor === flavor),
     total = assets.reduce((n, a) => n + a.size, 0);
   const name = `engine-${m.buildId}-${flavor}`,
-    staging = name + '-staging';
+    staging = `${name}-${crypto.randomUUID()}-staging`;
   await caches.delete(staging);
   const cache = await caches.open(staging);
   let loaded = 0;
+  let lastProgress = 0;
+  onProgress(0, total);
   try {
     for (const asset of assets) {
       const r = await fetch(`${assetUrl(asset.url)}?build=${m.buildId}`, {
@@ -59,7 +61,10 @@ export async function downloadAssetSet(
         if (done) break;
         chunks.push(value);
         loaded += value.length;
-        onProgress(loaded, total);
+        if (performance.now() - lastProgress > 80 || loaded === total) {
+          onProgress(loaded, total);
+          lastProgress = performance.now();
+        }
       }
       const bytes = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0));
       let offset = 0;

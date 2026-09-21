@@ -25,6 +25,9 @@ import {
   ArrowLeft,
   GraduationCap,
   Activity,
+  ChartNoAxesCombined,
+  ScanLine,
+  Eraser,
   PanelLeftClose,
   Flag,
   CheckCircle2,
@@ -44,6 +47,7 @@ import {
 } from '../chess/tree';
 import { Board } from '../board/Board';
 import { samplePgn } from './sample';
+import { prepareWorker, type EngineLoadState } from '../engine/prepare-worker';
 import { ENGINE_BUILD_ID } from '../engine/build';
 import { EngineClient, positionKey } from '../engine/worker-client';
 import type { AnalysisResult, EngineFlavor } from '../engine/types';
@@ -117,6 +121,14 @@ export default function App() {
     [engineStatus, setEngineStatus] = useState('Loading engine'),
     [assessments, setAssessments] = useState<Record<string, MoveAssessment>>({}),
     [reviewing, setReviewing] = useState(false),
+    [reviewCompleted, setReviewCompleted] = useState(0),
+    [reviewSpeed, setReviewSpeed] = useState<'quick' | 'deep'>('quick'),
+    [engineGeneration, setEngineGeneration] = useState(0),
+    [engineLoad, setEngineLoad] = useState<EngineLoadState>({
+      phase: 'checking',
+      loaded: 0,
+      total: 0,
+    }),
     [error, setError] = useState(''),
     [savedRevision, setSaved] = useState(''),
     [toast, setToast] = useState('');
@@ -137,7 +149,15 @@ export default function App() {
       : savedRevision === 'error'
         ? 'Not saved'
         : 'Saving…';
-  const engine = useMemo(() => new EngineClient(flavor), [flavor]);
+  const engine = useMemo(
+    () =>
+      new EngineClient(flavor, async (_url, signal) => {
+        return prepareWorker(flavor, signal, (state) => {
+          if (!signal.aborted) setEngineLoad(state);
+        });
+      }),
+    [flavor, engineGeneration],
+  );
   const engineAbort = useRef<AbortController | null>(null),
     reviewAbort = useRef<AbortController | null>(null),
     retryAbort = useRef<AbortController | null>(null),
@@ -211,7 +231,7 @@ export default function App() {
     return () => {
       active = false;
     };
-  }, [flavor, depth, orientation, booted]);
+  }, [flavor, depth, orientation, booted, engineLoad.phase === 'ready']);
   useEffect(() => {
     analysisLoaded.current = false;
     setAssessments({});
@@ -246,7 +266,7 @@ export default function App() {
     if (currentStudy.current.id === id) setAssessments((old) => ({ ...old, [a.nodeId]: a }));
   };
   useEffect(() => {
-    if (!booted || !openingReady || !engineOn || retry || demo) return;
+    if (!booted || !openingReady || !engineOn || retry || demo || reviewing) return;
     const abort = new AbortController();
     engineAbort.current = abort;
     const s = study,
@@ -264,20 +284,29 @@ export default function App() {
           },
           abort.signal,
           (partial) => {
-            if (!abort.signal.aborted) setResult(partial);
+            if (!abort.signal.aborted) {
+              setResult(partial);
+              setEngineLoad({ phase: 'ready', loaded: 0, total: 0 });
+            }
           },
         );
         if (abort.signal.aborted) return;
         setResult(r);
         setEngineStatus('Ready');
+        setEngineLoad({ phase: 'ready', loaded: 0, total: 0 });
         const existing = assessmentRef.current[node];
-        if (node !== s.rootId && (!existing || existing.depth < depth) && !reviewing) {
-          const a = await assessMove(s, node, engine, abort.signal, depth, 'interactive');
+        if (
+          node !== s.rootId &&
+          (!existing || (existing.depth < depth && existing.reviewProfile !== `quick:${depth}`)) &&
+          !reviewing
+        ) {
+          const a = await assessMove(s, node, engine, abort.signal, depth, 'interactive', 'quick');
           if (!abort.signal.aborted) storeAssessment(a, s.id);
         }
       } catch (e) {
         if (!abort.signal.aborted) {
           setEngineStatus('Unavailable');
+          setEngineLoad({ phase: 'error', loaded: 0, total: 0, error: errorMessage(e) });
           setError(errorMessage(e));
         }
       }
@@ -294,6 +323,7 @@ export default function App() {
     infinite,
     retry !== null,
     demo !== null,
+    reviewing,
   ]);
   useEffect(() => {
     if (!toast) return;
@@ -387,15 +417,31 @@ export default function App() {
     reviewAbort.current = abort;
     const s = currentStudy.current;
     setReviewing(true);
+    setReviewCompleted(0);
+    const profile = `${reviewSpeed}:${depth}`;
+    const force = s.mainline.every((id) => assessmentRef.current[id]?.reviewProfile === profile);
     try {
       await loadOpenings();
-      for (const id of s.mainline) {
+      for (const [index, id] of s.mainline.entries()) {
         if (abort.signal.aborted) break;
-        const a = await assessMove(s, id, engine, abort.signal, depth);
-        if (!abort.signal.aborted) storeAssessment(a, s.id);
+        if (!force && assessmentRef.current[id]?.reviewProfile === profile) {
+          setReviewCompleted(index + 1);
+          continue;
+        }
+        const a = await assessMove(s, id, engine, abort.signal, depth, 'review', reviewSpeed);
+        a.reviewProfile = profile;
+        if (!abort.signal.aborted) setEngineLoad({ phase: 'ready', loaded: 0, total: 0 });
+        if (!abort.signal.aborted) {
+          storeAssessment(a, s.id);
+          setReviewCompleted(index + 1);
+        }
       }
     } catch (e) {
-      if (!abort.signal.aborted) setError(errorMessage(e));
+      if (!abort.signal.aborted) {
+        setError(errorMessage(e));
+        setEngineStatus('Unavailable');
+        setEngineLoad({ phase: 'error', loaded: 0, total: 0, error: errorMessage(e) });
+      }
     } finally {
       if (reviewAbort.current === abort) setReviewing(false);
     }
@@ -583,6 +629,23 @@ export default function App() {
       </span>
     </div>
   );
+  const clearMarks = () =>
+    setStudy((s) => {
+      if (demo || retry || !s.nodes[s.selectedId].marks.length) return s;
+      const copy = structuredClone(s);
+      copy.nodes[copy.selectedId].marks = [];
+      copy.revision++;
+      return copy;
+    });
+  const retryEngine = () => {
+    reviewAbort.current?.abort();
+    setReviewing(false);
+    setError('');
+    setEngineStatus('Loading engine');
+    setEngineLoad({ phase: 'checking', loaded: 0, total: 0 });
+    setEngineOn(true);
+    setEngineGeneration((n) => n + 1);
+  };
   const downloadOffline = async () => {
     const abort = new AbortController();
     downloadAbort.current = abort;
@@ -613,7 +676,7 @@ export default function App() {
             aria-label="Game review"
             onClick={() => setTab('review')}
           >
-            <Activity size={23} />
+            <ChartNoAxesCombined size={23} />
             <span>Review</span>
           </button>
           <button className="nav-item" title="Analysis" onClick={() => setTab('analysis')}>
@@ -727,6 +790,7 @@ export default function App() {
                 onToggleMark={(m) => {
                   if (!demo && !retry) setStudy((s) => toggleMark(s, s.selectedId, m));
                 }}
+                onClearMarks={clearMarks}
                 drawingMode={mode}
                 drawingColor={drawingColor}
                 disabled={retryBusy || Boolean(demo)}
@@ -773,16 +837,9 @@ export default function App() {
                 <button
                   title="Clear annotations"
                   aria-label="Clear annotations"
-                  onClick={() =>
-                    setStudy((s) => {
-                      const copy = structuredClone(s);
-                      copy.nodes[copy.selectedId].marks = [];
-                      copy.revision++;
-                      return copy;
-                    })
-                  }
+                  onClick={clearMarks}
                 >
-                  <Trash2 size={16} />
+                  <Eraser size={18} />
                 </button>
               </div>
               <div className="board-utility">
@@ -803,7 +860,7 @@ export default function App() {
               </div>
             </div>
             <div className="board-caption">
-              <span>Right-click to highlight · Right-drag to draw</span>
+              <span>Right-click: yellow / clear · Ctrl: red · Right-drag: arrow</span>
               <span>
                 <Check size={12} />
                 {saved}
@@ -946,9 +1003,9 @@ export default function App() {
                   onClick={() => setTab(t)}
                 >
                   {t === 'review' ? (
-                    <Activity size={17} />
+                    <ChartNoAxesCombined size={17} />
                   ) : t === 'analysis' ? (
-                    <MousePointer2 size={17} />
+                    <ScanLine size={17} />
                   ) : (
                     <BookOpen size={17} />
                   )}{' '}
@@ -971,7 +1028,15 @@ export default function App() {
               </span>
               <div className="engine-health">
                 <span className={engineStatus === 'Unavailable' ? 'bad-dot' : 'live-dot'} />
-                {engineOn ? engineStatus : 'Paused'}
+                {reviewing
+                  ? 'Reviewing'
+                  : engineOn
+                    ? engineLoad.phase === 'downloading'
+                      ? 'Downloading'
+                      : engineLoad.phase === 'starting'
+                        ? 'Starting'
+                        : engineStatus
+                    : 'Paused'}
               </div>
               <button
                 className="icon-button"
@@ -982,12 +1047,125 @@ export default function App() {
                 <Settings2 size={16} />
               </button>
             </div>
+            {engineLoad.phase !== 'ready' && (engineOn || reviewing) && (
+              <div className={`engine-loader ${engineLoad.phase}`} role="status" aria-live="polite">
+                <div className="engine-loader-title">
+                  {engineLoad.phase === 'error' ? (
+                    <Info size={18} />
+                  ) : (
+                    <LoaderCircle className="spin" size={18} />
+                  )}
+                  <strong>
+                    {engineLoad.phase === 'error'
+                      ? 'Engine could not start'
+                      : engineLoad.phase === 'downloading'
+                        ? engineLoad.loaded === engineLoad.total
+                          ? 'Verifying engine…'
+                          : 'Downloading Stockfish…'
+                        : engineLoad.phase === 'starting'
+                          ? 'Starting Stockfish…'
+                          : 'Preparing Stockfish…'}
+                  </strong>
+                  {engineLoad.total > 0 && (
+                    <span>{Math.round((engineLoad.loaded / engineLoad.total) * 100)}%</span>
+                  )}
+                </div>
+                {engineLoad.total > 0 && (
+                  <>
+                    <progress
+                      aria-label="Engine download progress"
+                      value={engineLoad.loaded}
+                      max={engineLoad.total}
+                    />
+                    <small>
+                      {(engineLoad.loaded / 1048576).toFixed(1)} /{' '}
+                      {(engineLoad.total / 1048576).toFixed(1)} MB · Saved for future visits
+                    </small>
+                  </>
+                )}
+                {engineLoad.phase === 'error' ? (
+                  <>
+                    <p>{engineLoad.error}</p>
+                    <button className="secondary" onClick={retryEngine}>
+                      <RotateCcw size={15} /> Retry engine
+                    </button>
+                  </>
+                ) : (
+                  <p>You can explore the board while the engine loads.</p>
+                )}
+                {flavor === 'full' && engineLoad.phase !== 'starting' && (
+                  <button
+                    className="text-button"
+                    onClick={() => {
+                      reviewAbort.current?.abort();
+                      setReviewing(false);
+                      setError('');
+                      setFlavor('lite');
+                    }}
+                  >
+                    Use Lite · smaller download
+                  </button>
+                )}
+              </div>
+            )}
+            <div className="moves-heading">
+              <span>MOVES</span>
+              <span>
+                {study.mainline.length
+                  ? `${Math.ceil(study.mainline.length / 2)} moves`
+                  : 'New position'}
+                {opening && <b>{opening.eco}</b>}
+              </span>
+            </div>
+            <MoveList
+              study={study}
+              assessments={assessments}
+              onSelect={navigate}
+              hidden={Boolean(retry)}
+            />
+            <div className="transport">
+              <button
+                aria-label="Go to start"
+                onClick={() => (demo ? setDemo({ ...demo, index: 0 }) : navigate(study.rootId))}
+                disabled={Boolean(retry)}
+              >
+                <ChevronsLeft size={23} />
+              </button>
+              <button aria-label="Previous move" onClick={() => step(-1)} disabled={Boolean(retry)}>
+                <ChevronLeft size={25} />
+              </button>
+              <button
+                aria-label={autoplay ? 'Pause playback' : 'Play moves'}
+                className="play-button"
+                onClick={() => setAutoplay((v) => !v)}
+                disabled={Boolean(retry)}
+              >
+                {autoplay ? <Pause size={21} /> : <Play size={21} fill="currentColor" />}
+              </button>
+              <button aria-label="Next move" onClick={() => step(1)} disabled={Boolean(retry)}>
+                <ChevronRight size={25} />
+              </button>
+              <button
+                aria-label="Go to end"
+                onClick={() =>
+                  demo
+                    ? setDemo({ ...demo, index: demo.line.length })
+                    : navigate(study.mainline.at(-1) || study.rootId)
+                }
+                disabled={Boolean(retry)}
+              >
+                <ChevronsRight size={23} />
+              </button>
+            </div>
             <div className="panel-body">
               {tab === 'review' && !retry ? (
                 <ReviewPanel
                   study={study}
                   assessments={assessments}
                   reviewing={reviewing}
+                  completed={reviewCompleted}
+                  speed={reviewSpeed}
+                  onSpeed={setReviewSpeed}
                   onReview={runReview}
                   onStop={() => {
                     reviewAbort.current?.abort();
@@ -1049,55 +1227,6 @@ export default function App() {
                   hidden={Boolean(retry)}
                 />
               )}
-            </div>
-            <div className="moves-heading">
-              <span>MOVES</span>
-              <span>
-                {study.mainline.length
-                  ? `${Math.ceil(study.mainline.length / 2)} moves`
-                  : 'New position'}
-                {opening && <b>{opening.eco}</b>}
-              </span>
-            </div>
-            <MoveList
-              study={study}
-              assessments={assessments}
-              onSelect={navigate}
-              hidden={Boolean(retry)}
-            />
-            <div className="transport">
-              <button
-                aria-label="Go to start"
-                onClick={() => (demo ? setDemo({ ...demo, index: 0 }) : navigate(study.rootId))}
-                disabled={Boolean(retry)}
-              >
-                <ChevronsLeft size={23} />
-              </button>
-              <button aria-label="Previous move" onClick={() => step(-1)} disabled={Boolean(retry)}>
-                <ChevronLeft size={25} />
-              </button>
-              <button
-                aria-label={autoplay ? 'Pause playback' : 'Play moves'}
-                className="play-button"
-                onClick={() => setAutoplay((v) => !v)}
-                disabled={Boolean(retry)}
-              >
-                {autoplay ? <Pause size={21} /> : <Play size={21} fill="currentColor" />}
-              </button>
-              <button aria-label="Next move" onClick={() => step(1)} disabled={Boolean(retry)}>
-                <ChevronRight size={25} />
-              </button>
-              <button
-                aria-label="Go to end"
-                onClick={() =>
-                  demo
-                    ? setDemo({ ...demo, index: demo.line.length })
-                    : navigate(study.mainline.at(-1) || study.rootId)
-                }
-                disabled={Boolean(retry)}
-              >
-                <ChevronsRight size={23} />
-              </button>
             </div>
             <div className="panel-footer">
               <button onClick={() => saveFile('chess-room.pgn', exportPgn(study))}>
@@ -1324,7 +1453,10 @@ export default function App() {
                 </div>
                 <button
                   className="primary wide"
-                  disabled={downloadProgress !== null}
+                  disabled={
+                    downloadProgress !== null ||
+                    ['checking', 'downloading', 'starting'].includes(engineLoad.phase)
+                  }
                   onClick={downloadOffline}
                 >
                   {downloadProgress !== null ? (

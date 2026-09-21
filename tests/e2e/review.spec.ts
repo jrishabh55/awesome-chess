@@ -12,7 +12,9 @@ test('real Stockfish analysis, branch editing, and local reload', async ({ page 
   await page.getByRole('gridcell', { name: 'd4 empty', exact: true }).click();
   await expect(page.getByText('Sideline', { exact: true })).toBeVisible();
   await expect(page.locator('.move-feedback')).toBeVisible({ timeout: 90000 });
-  await page.getByRole('gridcell', { name: 'a3 empty', exact: true }).click({ button: 'right' });
+  await page
+    .getByRole('gridcell', { name: 'a3 empty', exact: true })
+    .click({ button: 'right', modifiers: ['Control'] });
   await expect(page.locator('.board-overlay rect')).toHaveCount(1);
   await expect(page.getByText('Saved on this device', { exact: true })).toBeVisible();
   await page.reload();
