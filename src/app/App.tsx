@@ -361,18 +361,17 @@ export default function App() {
   }, [autoplay, demo]);
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
       if (
-        (e.target as HTMLElement).closest(
-          'input,textarea,select,[contenteditable="true"],[role="gridcell"]',
-        ) ||
+        (e.target instanceof HTMLElement &&
+          (e.target.closest('input,textarea') || e.target.isContentEditable)) ||
         modal ||
         retry
       )
         return;
-      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-        e.preventDefault();
-        step(e.key === 'ArrowLeft' ? -1 : 1);
-      }
+      e.preventDefault();
+      setAutoplay(false);
+      step(e.key === 'ArrowLeft' ? -1 : 1);
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);

@@ -238,9 +238,9 @@ export function Board({
                   role="img"
                   aria-label={`${badge} move`}
                   title={badge}
-                  style={{ background: labelInfo[badge].color }}
+                  style={{ color: labelInfo[badge].color }}
                 >
-                  <MoveQualityIcon label={badge} size={18} />
+                  <MoveQualityIcon label={badge} size={24} />
                 </span>
               )}
             </button>
@@ -318,7 +318,7 @@ export function Board({
                 stroke={hues[mark.color]}
                 strokeWidth=".14"
                 opacity=".85"
-                strokeLinecap="round"
+                strokeLinecap="butt"
                 strokeLinejoin="round"
                 markerEnd={`url(#arrow-${mark.color})`}
               />
@@ -335,7 +335,7 @@ export function Board({
               fill="none"
               stroke={hues[gesture.current.color]}
               strokeWidth=".14"
-              strokeLinecap="round"
+              strokeLinecap="butt"
               strokeLinejoin="round"
               opacity=".8"
               markerEnd={`url(#arrow-${gesture.current.color})`}

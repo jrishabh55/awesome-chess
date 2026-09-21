@@ -63,9 +63,9 @@ export function AnalysisPanel({
           <div className="feedback-title">
             <span
               className="classification-icon"
-              style={{ background: labelInfo[assessment.primary].color }}
+              style={{ color: labelInfo[assessment.primary].color }}
             >
-              <MoveQualityIcon label={assessment.primary} />
+              <MoveQualityIcon label={assessment.primary} size={22} />
             </span>
             <div>
               <strong>

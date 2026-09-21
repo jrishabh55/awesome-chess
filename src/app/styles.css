@@ -494,7 +494,7 @@ h1 {
   font-size: 12px;
   color: #9fa895;
   flex: 1;
-  padding: 18px 5px 16px;
+  padding: 12px 5px 11px;
   border-bottom: 2px solid transparent;
 }
 .panel-tabs button.active {
@@ -506,7 +506,7 @@ h1 {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 16px;
+  padding: 9px 14px;
   border-bottom: 1px solid #363e2e;
   font-size: 10px;
   color: #bdc5b2;
@@ -570,7 +570,7 @@ h1 {
   scrollbar-color: #535e45 transparent;
 }
 .review-content {
-  padding: 22px 21px 18px;
+  padding: 15px 16px;
 }
 .eyebrow {
   font-size: 8px;
@@ -579,11 +579,11 @@ h1 {
   font-weight: 650;
 }
 .review-intro h2 {
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 550;
   letter-spacing: -0.7px;
-  margin-top: 8px;
-  margin-bottom: 7px;
+  margin-top: 5px;
+  margin-bottom: 4px;
 }
 .review-intro p {
   font-size: 11px;
@@ -592,14 +592,14 @@ h1 {
 .accuracy-cards {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-top: 21px;
+  gap: 8px;
+  margin-top: 12px;
 }
 .accuracy-card {
   background: #343a2d;
   border: 1px solid #444d37;
-  border-radius: 9px;
-  padding: 13px 14px;
+  border-radius: 7px;
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
 }
@@ -634,10 +634,10 @@ h1 {
   border-color: #747d69;
 }
 .accuracy-card > strong {
-  font-size: 36px;
+  font-size: 30px;
   letter-spacing: -1.4px;
   font-weight: 600;
-  margin: 6px 0 4px;
+  margin: 4px 0 3px;
   line-height: 1.15;
   color: #dce8cd;
 }
@@ -694,11 +694,14 @@ h1 {
   top: calc(100% + 7px);
 }
 .review-action {
-  margin-top: 18px;
+  margin-top: 12px;
 }
 .review-action > .primary {
   width: 100%;
-  font-size: 13px;
+  font-size: 12px;
+  min-height: 38px;
+  padding: 8px 13px;
+  box-shadow: 0 2px 0 #73954f;
 }
 .review-action > .primary > svg:last-child {
   margin-left: auto;
@@ -728,7 +731,7 @@ h1 {
   transition: width 0.3s;
 }
 .classification-table {
-  margin: 22px 0 16px;
+  margin: 15px 0 12px;
 }
 .table-head,
 .quality-row {
@@ -749,7 +752,7 @@ h1 {
 .quality-row {
   font-size: 11px;
   border-radius: 4px;
-  padding: 3px 0;
+  padding: 1px 0;
 }
 .quality-row:nth-child(even) {
   background: #2f3628;
@@ -761,7 +764,7 @@ h1 {
 }
 .quality-row > span {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   align-items: center;
   text-align: left;
   padding-left: 14px;
@@ -774,8 +777,8 @@ h1 {
 }
 .report-card {
   border-top: 1px solid var(--line);
-  margin-top: 18px;
-  padding-top: 17px;
+  margin-top: 13px;
+  padding-top: 12px;
 }
 .section-heading {
   display: flex;
@@ -794,7 +797,7 @@ h1 {
   display: grid;
   grid-template-columns: 1.7fr 1fr 1fr;
   gap: 7px;
-  padding: 9px 0;
+  padding: 7px 0;
   font-size: 10px;
   color: #b8c4aa;
   border-bottom: 1px solid #39422f;
@@ -817,7 +820,7 @@ h1 {
 .moves-heading {
   display: flex;
   justify-content: space-between;
-  padding: 13px 17px 10px;
+  padding: 10px 14px 8px;
   border-top: 1px solid var(--line);
   font-size: 8px;
   letter-spacing: 1.3px;
@@ -859,7 +862,7 @@ h1 {
 .move-row {
   display: grid;
   grid-template-columns: 38px 1fr 1fr;
-  min-height: 31px;
+  min-height: 28px;
   align-items: center;
   padding: 0 11px;
   gap: 3px;
@@ -873,7 +876,7 @@ h1 {
   padding-left: 5px;
 }
 .move-cell {
-  padding: 6px 10px;
+  padding: 4px 9px;
   font-size: 12px;
   display: flex;
   justify-content: space-between;
@@ -882,7 +885,7 @@ h1 {
   color: #d4dcc9;
   text-align: left;
   font-weight: 550;
-  min-height: 29px;
+  min-height: 27px;
 }
 .move-cell:hover {
   background: #3e4a33;
@@ -912,12 +915,12 @@ h1 {
   display: flex;
   justify-content: space-around;
   border-top: 1px solid var(--line);
-  padding: 10px 15px;
+  padding: 6px 14px;
   align-items: center;
   background: #2e3528;
 }
 .transport button {
-  height: 35px;
+  height: 32px;
   min-width: 42px;
   display: grid;
   place-items: center;
@@ -965,10 +968,10 @@ h1 {
   height: 4px;
 }
 .analysis-content {
-  padding: 19px 18px;
+  padding: 15px 16px;
 }
 .engine-lines {
-  margin-top: 13px;
+  margin-top: 10px;
   border: 1px solid #424e34;
   border-radius: 7px;
   overflow: hidden;
@@ -978,7 +981,7 @@ h1 {
   align-items: center;
   width: 100%;
   gap: 9px;
-  padding: 11px 10px;
+  padding: 8px 9px;
   border-bottom: 1px solid #3e4933;
   text-align: left;
 }
@@ -1021,9 +1024,9 @@ h1 {
   color: #a7ba95;
 }
 .move-feedback {
-  margin-top: 20px;
+  margin-top: 14px;
   border-top: 1px solid #435137;
-  padding-top: 17px;
+  padding-top: 12px;
 }
 .feedback-title {
   display: flex;
@@ -1031,12 +1034,10 @@ h1 {
   align-items: center;
 }
 .classification-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
+  width: 24px;
+  height: 24px;
   display: grid;
   place-items: center;
-  color: #26321e;
   font-weight: 700;
   flex-shrink: 0;
 }
@@ -1057,7 +1058,7 @@ h1 {
 .analysis-tip {
   display: flex;
   gap: 5px;
-  margin-top: 22px;
+  margin-top: 14px;
   color: #9fb18b;
   font-size: 10px;
   line-height: 1.6;
@@ -1080,20 +1081,20 @@ h1 {
   color: #9daf88;
 }
 .opening-panel {
-  padding: 25px 23px;
+  padding: 16px;
 }
 .opening-icon {
-  width: 56px;
-  height: 56px;
+  width: 42px;
+  height: 42px;
   border-radius: 12px;
   background: #3c4b2e;
   color: #bbd897;
   display: grid;
   place-items: center;
-  margin-bottom: 22px;
+  margin-bottom: 12px;
 }
 .opening-panel h2 {
-  font-size: 24px;
+  font-size: 21px;
   letter-spacing: -0.6px;
   font-weight: 550;
   line-height: 1.2;
@@ -1126,7 +1127,7 @@ h1 {
   margin-top: 17px;
 }
 .opening-note {
-  margin-top: 25px;
+  margin-top: 16px;
   padding: 16px 0 0;
   border-top: 1px solid #425135;
   display: flex;
@@ -1527,13 +1528,13 @@ h1 {
     height: 235px;
   }
   .review-intro h2 {
-    font-size: 29px;
+    font-size: 22px;
   }
   .review-content {
-    padding: 27px;
+    padding: 17px;
   }
   .accuracy-card {
-    padding: 18px;
+    padding: 12px;
   }
   .eval-chart {
     height: 120px;
@@ -1558,7 +1559,7 @@ h1 {
     font-size: 8px;
   }
   .review-content {
-    padding: 18px 17px;
+    padding: 14px;
   }
   .review-intro h2 {
     font-size: 21px;
@@ -1625,10 +1626,10 @@ h1 {
     height: 220px;
   }
   .review-content {
-    padding: 25px;
+    padding: 16px;
   }
   .review-intro h2 {
-    font-size: 27px;
+    font-size: 22px;
   }
   .accuracy-player > .muted {
     display: inline;
@@ -1751,13 +1752,13 @@ h1 {
     max-width: 150px;
   }
   .review-content {
-    padding: 22px 19px;
+    padding: 14px;
   }
   .review-intro h2 {
-    font-size: 25px;
+    font-size: 20px;
   }
   .accuracy-card > strong {
-    font-size: 34px;
+    font-size: 30px;
   }
   .panel-tabs {
     padding: 0 8px;
@@ -1766,7 +1767,7 @@ h1 {
     font-size: 11px;
   }
   .engine-status {
-    padding: 12px 13px;
+    padding: 9px 13px;
     gap: 6px;
   }
   .engine-health {
@@ -1847,7 +1848,7 @@ h1 {
 
 /* Keep navigation close to the board; reports follow the moves. */
 .analysis-column > .move-list {
-  height: clamp(170px, 27vh, 290px);
+  height: clamp(160px, 23vh, 240px);
 }
 .analysis-column > .panel-body {
   border-top: 1px solid var(--line);
@@ -1900,18 +1901,18 @@ h1 {
   gap: 12px;
   font-size: 11px;
   color: #bdcbb0;
-  margin: 16px 0 8px;
+  margin: 12px 0 6px;
 }
 .review-speed select {
   max-width: 65%;
   font-size: 11px;
-  padding: 8px;
+  padding: 6px 8px;
 }
 .review-speed-note {
   font-size: 10px;
-  line-height: 1.6;
+  line-height: 1.45;
   color: #a0ac93;
-  margin-bottom: 15px;
+  margin-bottom: 10px;
 }
 .move-symbol,
 .quality-row b,

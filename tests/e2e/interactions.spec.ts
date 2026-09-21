@@ -10,6 +10,40 @@ async function center(page: import('@playwright/test').Page, square: string) {
   return { x: box!.x + box!.width / 2, y: box!.y + box!.height / 2 };
 }
 
+test('arrow keys navigate after board clicks, annotations, and focused panel controls', async ({
+  page,
+}) => {
+  await quietBoard(page);
+  await page.getByRole('gridcell', { name: 'b1 white knight', exact: true }).click();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByRole('gridcell', { name: 'e4 white pawn', exact: true })).toBeVisible();
+  await page.getByRole('gridcell', { name: 'a3 empty', exact: true }).click({ button: 'right' });
+  await page.keyboard.press('ArrowLeft');
+  await expect(page.getByRole('gridcell', { name: 'e2 white pawn', exact: true })).toBeVisible();
+  await page.getByRole('combobox', { name: 'Review speed' }).focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByRole('gridcell', { name: 'e4 white pawn', exact: true })).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Review speed' })).toHaveValue('quick');
+});
+
+test('keyboard navigation follows a played sideline and preserves text editing', async ({
+  page,
+}) => {
+  await quietBoard(page);
+  await page.getByRole('gridcell', { name: 'd2 white pawn', exact: true }).click();
+  await page.getByRole('gridcell', { name: 'd4 empty', exact: true }).click();
+  await page.keyboard.press('ArrowLeft');
+  await expect(page.getByRole('gridcell', { name: 'd2 white pawn', exact: true })).toBeVisible();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByRole('gridcell', { name: 'd4 white pawn', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Import game', exact: true }).click();
+  const input = page.getByRole('textbox', { name: 'PGN or FEN' });
+  await input.fill('1. e4');
+  await input.press('ArrowLeft');
+  await expect(page.getByRole('gridcell', { name: 'd4 white pawn', exact: true })).toBeVisible();
+  expect(await input.evaluate((el: HTMLTextAreaElement) => el.selectionStart)).toBe(4);
+});
+
 test('pieces keep their identity and animate when moving and rewinding', async ({ page }) => {
   await quietBoard(page);
   const pawn = await page.locator('[data-piece="e2"]').elementHandle();
