@@ -4,6 +4,7 @@ export interface BoardPiece {
   square: Square;
   color: Color;
   type: PieceSymbol;
+  durationMs: number;
 }
 let nextId = 0;
 export function reconcilePieces(previous: BoardPiece[], fen: string): BoardPiece[] {
@@ -22,7 +23,7 @@ export function reconcilePieces(previous: BoardPiece[], fen: string): BoardPiece
       remaining.delete(old);
     }
   }
-  return next.map((p) => {
+  const reconciled = next.map((p) => {
     let old = matched.get(p.square);
     if (!old) {
       const distance = (q: BoardPiece) =>
@@ -42,6 +43,20 @@ export function reconcilePieces(previous: BoardPiece[], fen: string): BoardPiece
         );
       if (old) remaining.delete(old);
     }
-    return { ...p, id: old?.id || `piece-${++nextId}` };
+    const distance = old
+      ? Math.hypot(old.square.charCodeAt(0) - p.square.charCodeAt(0), +old.square[1] - +p.square[1])
+      : 0;
+    return {
+      ...p,
+      id: old?.id || `piece-${++nextId}`,
+      // Long moves need visible travel time; cap it to keep navigation responsive.
+      durationMs: Math.round(Math.min(420, 220 + Math.max(0, distance - 1) * 35)),
+    };
   });
+  // React reinserts keyed DOM nodes when array order changes, cancelling CSS transitions.
+  // Keep surviving pieces in their original rendering order; append newly restored pieces.
+  const order = new Map(previous.map((piece, index) => [piece.id, index]));
+  return reconciled.sort(
+    (a, b) => (order.get(a.id) ?? previous.length) - (order.get(b.id) ?? previous.length),
+  );
 }

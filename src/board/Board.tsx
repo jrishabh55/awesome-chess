@@ -1,5 +1,5 @@
 import { assetUrl } from '../app/asset-url';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Chess } from 'chess.js';
 import type { Color, Square, Mark, DrawingColor } from '../chess/types';
 import { pointToSquare, squareToPoint } from './coordinates';
@@ -258,9 +258,12 @@ export function Board({
                 key={piece.id}
                 data-piece={piece.square}
                 className={`board-piece ${dragging ? 'dragging' : ''}`}
-                style={{
-                  transform: `translate(${(point.x - 0.5) * 100}%, ${(point.y - 0.5) * 100}%)`,
-                }}
+                style={
+                  {
+                    '--piece-duration': `${piece.durationMs}ms`,
+                    transform: `translate(${(point.x - 0.5) * 100}%, ${(point.y - 0.5) * 100}%)`,
+                  } as CSSProperties
+                }
               >
                 <img
                   src={assetUrl(`assets/pieces/${piece.color}${piece.type.toUpperCase()}.svg`)}

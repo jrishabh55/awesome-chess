@@ -47,13 +47,66 @@ test('keyboard navigation follows a played sideline and preserves text editing',
 test('pieces keep their identity and animate when moving and rewinding', async ({ page }) => {
   await quietBoard(page);
   const pawn = await page.locator('[data-piece="e2"]').elementHandle();
-  expect(await pawn!.evaluate((el) => getComputedStyle(el).transitionDuration)).toBe('0.19s');
+  expect(await pawn!.evaluate((el) => getComputedStyle(el).transitionDuration)).toBe('0.22s');
   await page.getByRole('gridcell', { name: 'e2 white pawn', exact: true }).click();
   await page.getByRole('gridcell', { name: 'e4 empty', exact: true }).click();
   expect(await pawn!.getAttribute('data-piece')).toBe('e4');
   expect(await pawn!.evaluate((el) => el.getAnimations().length)).toBeGreaterThan(0);
   await page.getByRole('button', { name: 'Previous move', exact: true }).click();
   expect(await pawn!.getAttribute('data-piece')).toBe('e2');
+});
+
+test('long moves visibly travel across the board in both keyboard directions', async ({ page }) => {
+  await quietBoard(page);
+  await page.getByRole('button', { name: 'Import game', exact: true }).click();
+  await page
+    .getByRole('textbox', { name: 'PGN or FEN' })
+    .fill('[SetUp "1"]\n[FEN "8/8/7k/8/8/8/7K/R7 w - - 0 1"]\n\n1. Ra8 *');
+  await page.getByRole('button', { name: 'Import & explore' }).click();
+  await page.getByRole('button', { name: 'Go to start', exact: true }).click();
+  const rook = await page.locator('[data-piece="a1"]').elementHandle();
+  await rook!.evaluate(async (el) => {
+    await Promise.all(el.getAnimations().map((animation) => animation.finished));
+    await new Promise<number>(requestAnimationFrame);
+    await new Promise<number>(requestAnimationFrame);
+  });
+  for (const [key, target] of [
+    ['ArrowRight', 'a8'],
+    ['ArrowLeft', 'a1'],
+  ] as const) {
+    await page.keyboard.press(key);
+    expect(await rook!.getAttribute('data-piece')).toBe(target);
+    const motion = await rook!.evaluate(async (el, destination) => {
+      const animation = el.getAnimations()[0];
+      if (!animation) return null;
+      animation.pause();
+      const duration = Number(animation.effect!.getTiming().duration);
+      animation.currentTime = duration / 2;
+      const origin = destination === 'a8' ? 'a1' : 'a8';
+      const squareTop = (square: string) =>
+        document
+          .querySelector(`[role="gridcell"][aria-label^="${square} "]`)!
+          .getBoundingClientRect().top;
+      const progress =
+        (el.getBoundingClientRect().top - squareTop(origin)) /
+        (squareTop(destination) - squareTop(origin));
+      animation.play();
+      await animation.finished;
+      return { duration, progress };
+    }, target);
+    expect(motion, `animation toward ${target}`).not.toBeNull();
+    expect(motion!.duration).toBeGreaterThanOrEqual(350);
+    expect(motion!.duration).toBeLessThanOrEqual(500);
+    expect(motion!.progress).toBeGreaterThan(0.25);
+    expect(motion!.progress).toBeLessThan(0.8);
+    await page.evaluate(async () => {
+      await new Promise<number>(requestAnimationFrame);
+      await new Promise<number>(requestAnimationFrame);
+    });
+  }
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.keyboard.press('ArrowRight');
+  expect(await rook!.evaluate((el) => el.getAnimations().length)).toBe(0);
 });
 
 test('right drawing uses the same color shortcuts for squares and smooth knight arrows', async ({

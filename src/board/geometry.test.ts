@@ -25,3 +25,12 @@ it('animates both castling pieces without changing their identities', () => {
   expect(after.find((p) => p.square === 'g1')?.id).toBe(before.find((p) => p.square === 'e1')?.id);
   expect(after.find((p) => p.square === 'f1')?.id).toBe(before.find((p) => p.square === 'h1')?.id);
 });
+it('keeps piece rendering order stable when a long move crosses other pieces', () => {
+  const c = new Chess('8/8/7k/8/8/8/7K/R7 w - - 0 1');
+  const before = reconcilePieces([], c.fen());
+  c.move('Ra8');
+  const after = reconcilePieces(before, c.fen());
+  expect(after.map((p) => p.id)).toEqual(before.map((p) => p.id));
+  c.undo();
+  expect(reconcilePieces(after, c.fen()).map((p) => p.id)).toEqual(before.map((p) => p.id));
+});
