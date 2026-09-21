@@ -58,6 +58,7 @@ test('PWA reloads and runs real Stockfish plus reviews with networking disabled'
     .getByRole('button', { name: 'Opening teacher', exact: true })
     .click();
   await page.getByRole('button', { name: 'Openings', exact: true }).click();
+  await page.getByRole('tab', { name: 'Single lines', exact: true }).click();
   await page
     .getByRole('combobox', { name: 'Opening name, variation, or ECO' })
     .fill('Sicilian Dragon');
@@ -66,6 +67,26 @@ test('PWA reloads and runs real Stockfish plus reviews with networking disabled'
   await opening.click();
   await page.getByRole('button', { name: 'Learn selected opening', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'White plays e4', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Openings', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Opening course', exact: true }).fill('London');
+  await page.getByRole('option', { name: 'London System', exact: true }).click();
+  await page.getByRole('button', { name: 'Start London System', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'White: d4', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Go to end', exact: true }).click();
+  await page.getByRole('button', { name: 'Practice this variation', exact: true }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Your move as White', exact: true }),
+  ).toBeVisible();
+  await page.reload();
+  await page
+    .getByRole('navigation', { name: 'Workspace', exact: true })
+    .getByRole('button', { name: 'Opening teacher', exact: true })
+    .click();
+  await page.getByRole('button', { name: 'Resume course', exact: true }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Your move as White', exact: true }),
+  ).toBeVisible();
+  await expect(page.locator('.board-overlay > path')).toHaveCount(0);
 });
 test('failed engine download never reports offline readiness', async ({ page, context }) => {
   await page.goto('./');

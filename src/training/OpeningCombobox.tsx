@@ -1,24 +1,41 @@
-import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { Check, ChevronDown, Search, X } from 'lucide-react';
 import { searchOpeningCatalog, type CatalogOpening } from '../openings/catalog';
 import './combobox.css';
 
-interface Props {
-  entries: CatalogOpening[];
-  value: CatalogOpening | null;
-  onChange: (opening: CatalogOpening | null) => void;
+interface PickerProps<T extends { id: string }> {
+  value: T | null;
+  onChange: (item: T | null) => void;
+  searchItems: (query: string) => { items: T[]; total: number };
+  getLabel: (item: T) => string;
+  getSearchText: (item: T) => string;
+  renderOption: (item: T) => ReactNode;
   disabled?: boolean;
-  label?: string;
+  label: string;
+  placeholder: string;
+  itemName?: string;
 }
-const openingLabel = (opening: CatalogOpening) => `${opening.eco} · ${opening.name}`;
 
-export function OpeningCombobox({
-  entries,
+export function PickerCombobox<T extends { id: string }>({
   value,
   onChange,
+  searchItems,
+  getLabel,
+  getSearchText,
+  renderOption,
   disabled = false,
-  label = 'Opening name, variation, or ECO',
-}: Props) {
+  label,
+  placeholder,
+  itemName = 'opening',
+}: PickerProps<T>) {
   const id = useId();
   const listId = `${id}-results`;
   const root = useRef<HTMLDivElement>(null);
@@ -26,13 +43,14 @@ export function OpeningCombobox({
   const input = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLDivElement>(null);
   const localClear = useRef(false);
-  const [query, setQuery] = useState(() => (value ? openingLabel(value) : ''));
+  const valueLabel = value ? getLabel(value) : '';
+  const [query, setQuery] = useState(valueLabel);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
   const [placement, setPlacement] = useState({ above: false, maxHeight: 360 });
   // A selected display label includes punctuation that isn't part of the search index.
-  const search = value && query === openingLabel(value) ? value.name : query;
-  const results = useMemo(() => searchOpeningCatalog(entries, search, 0, 40), [entries, search]);
+  const search = value && query === valueLabel ? getSearchText(value) : query;
+  const results = useMemo(() => searchItems(search), [searchItems, search]);
   const activeEntry = results.items[active];
   const expanded = open && !disabled;
 
@@ -42,9 +60,9 @@ export function OpeningCombobox({
       return;
     }
     localClear.current = false;
-    setQuery(value ? openingLabel(value) : '');
+    setQuery(valueLabel);
     setActive(-1);
-  }, [value?.id, value?.eco, value?.name]);
+  }, [value?.id, valueLabel]);
 
   useEffect(() => {
     if (disabled) setOpen(false);
@@ -108,9 +126,9 @@ export function OpeningCombobox({
     const selected = results.items.findIndex((entry) => entry.id === value?.id);
     setActive(results.items.length ? Math.max(0, selected) : -1);
   };
-  const choose = (opening: CatalogOpening) => {
+  const choose = (opening: T) => {
     localClear.current = false;
-    setQuery(openingLabel(opening));
+    setQuery(getLabel(opening));
     setOpen(false);
     setActive(-1);
     onChange(opening);
@@ -157,7 +175,7 @@ export function OpeningCombobox({
             spellCheck={false}
             disabled={disabled}
             value={query}
-            placeholder="Sicilian Dragon, London, B90…"
+            placeholder={placeholder}
             onFocus={show}
             onClick={() => {
               if (!expanded) show();
@@ -253,28 +271,60 @@ export function OpeningCombobox({
                   key={entry.id}
                   id={`${id}-option-${index}`}
                   role="option"
-                  aria-label={openingLabel(entry)}
+                  aria-label={getLabel(entry)}
                   aria-selected={value?.id === entry.id}
                   className={`oc-option${active === index ? ' is-active' : ''}${value?.id === entry.id ? ' is-selected' : ''}`}
                   onMouseMove={() => setActive(index)}
                   onClick={() => choose(entry)}
                 >
-                  <span className="oc-eco">{entry.eco}</span>
-                  <span className="oc-name">{entry.name}</span>
+                  {renderOption(entry)}
                   {value?.id === entry.id && <Check size={14} aria-hidden="true" />}
                 </div>
               ))}
             </div>
             <div className="oc-result-status" role="status">
               {!results.total
-                ? 'No matching openings. Try a shorter name or an ECO code.'
+                ? `No matching ${itemName}s. Try a shorter name or an ECO code.`
                 : results.total > results.items.length
-                  ? `Showing ${results.items.length} of ${results.total.toLocaleString()} openings. Refine your search.`
-                  : `${results.total} ${results.total === 1 ? 'opening' : 'openings'} found`}
+                  ? `Showing ${results.items.length} of ${results.total.toLocaleString()} ${itemName}s. Refine your search.`
+                  : `${results.total} ${itemName}${results.total === 1 ? '' : 's'} found`}
             </div>
           </div>
         )}
       </div>
     </div>
+  );
+}
+
+export function OpeningCombobox({
+  entries,
+  value,
+  onChange,
+  disabled,
+  label = 'Opening name, variation, or ECO',
+}: {
+  entries: CatalogOpening[];
+  value: CatalogOpening | null;
+  onChange: (opening: CatalogOpening | null) => void;
+  disabled?: boolean;
+  label?: string;
+}) {
+  return (
+    <PickerCombobox
+      value={value}
+      onChange={onChange}
+      disabled={disabled}
+      label={label}
+      placeholder="Sicilian Dragon, London, B90…"
+      searchItems={(query) => searchOpeningCatalog(entries, query, 0, 40)}
+      getLabel={(entry) => `${entry.eco} · ${entry.name}`}
+      getSearchText={(entry) => entry.name}
+      renderOption={(entry) => (
+        <>
+          <span className="oc-eco">{entry.eco}</span>
+          <span className="oc-name">{entry.name}</span>
+        </>
+      )}
+    />
   );
 }

@@ -14,8 +14,12 @@ for (const viewport of [
     const menu = page.getByRole('navigation', { name: 'Workspace' });
     for (const mode of ['Game review', 'Opening teacher', 'Play Stockfish']) {
       await menu.getByRole('button', { name: mode, exact: true }).click();
-      if (mode === 'Opening teacher')
-        await page.getByRole('button', { name: 'Start course', exact: true }).click();
+      if (mode === 'Opening teacher') {
+        await page.getByRole('button', { name: 'Openings', exact: true }).click();
+        await page.getByRole('combobox', { name: 'Opening course', exact: true }).fill('London');
+        await page.getByRole('option', { name: 'London System', exact: true }).click();
+        await page.getByRole('button', { name: 'Start London System', exact: true }).click();
+      }
       if (mode === 'Play Stockfish') {
         await page.getByRole('button', { name: 'Start game', exact: true }).click();
         await expect(page.getByRole('heading', { name: 'Your move', exact: true })).toBeVisible();

@@ -11,7 +11,7 @@ async function openLibrary(page: Page) {
   await page.getByRole('button', { name: 'Openings', exact: true }).click();
 }
 async function selectOpening(page: Page, name: string) {
-  await page.getByRole('tab', { name: 'Browse', exact: true }).click();
+  await page.getByRole('tab', { name: 'Single lines', exact: true }).click();
   await page.getByRole('combobox', { name: 'Opening name, variation, or ECO' }).fill(name);
   await page.getByRole('listbox').getByRole('option').first().click();
   await page.getByRole('button', { name: 'Add to repertoire', exact: true }).click();
@@ -128,6 +128,7 @@ test('family browsing is paged and damaged local libraries remain untouched', as
   await page.evaluate((key) => localStorage.setItem(key, 'unreadable saved library'), libraryKey);
   await openLibrary(page);
   await expect(page.getByRole('alert')).toContainText('has not been overwritten');
+  await page.getByRole('tab', { name: 'Single lines', exact: true }).click();
   const familySelect = page.getByRole('combobox', { name: 'Opening family', exact: true });
   const option = familySelect.locator('option').filter({ hasText: /^Sicilian Defense \(/ });
   await expect(option).toHaveCount(1);

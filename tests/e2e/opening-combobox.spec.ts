@@ -7,6 +7,7 @@ async function openPicker(page: Page) {
     .getByRole('button', { name: 'Opening teacher', exact: true })
     .click();
   await page.getByRole('button', { name: 'Openings', exact: true }).click();
+  await page.getByRole('tab', { name: 'Single lines', exact: true }).click();
   return page.getByRole('combobox', { name: 'Opening name, variation, or ECO', exact: true });
 }
 

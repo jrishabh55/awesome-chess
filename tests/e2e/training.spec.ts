@@ -8,6 +8,11 @@ async function openTeacher(page: Page) {
     .click();
   await expect(page.getByRole('heading', { name: 'Opening Teacher', exact: true })).toBeVisible();
 }
+async function startShortCourse(page: Page) {
+  await page.getByRole('button', { name: 'Openings', exact: true }).click();
+  await page.getByText('Short guided lessons', { exact: true }).click();
+  await page.getByRole('button', { name: 'Start Italian Game', exact: true }).click();
+}
 async function move(page: Page, from: string, to: string) {
   await page.getByRole('gridcell', { name: new RegExp(`^${from} `) }).focus();
   await page.keyboard.press('Enter');
@@ -23,7 +28,7 @@ async function finishGuide(page: Page) {
 
 test('opening teacher guides, validates drills, and resumes locally', async ({ page }) => {
   await openTeacher(page);
-  await page.getByRole('button', { name: 'Start course', exact: true }).click();
+  await startShortCourse(page);
   await expect(page.getByRole('heading', { name: 'White plays e4' })).toBeVisible();
   await expect(page.locator('.board-overlay')).toBeVisible();
   await expect(page.locator('.board-overlay > path')).toHaveCount(1);
@@ -100,7 +105,7 @@ for (const viewport of [
   }) => {
     await page.setViewportSize(viewport);
     await openTeacher(page);
-    await page.getByRole('button', { name: 'Start course', exact: true }).click();
+    await startShortCourse(page);
     const geometry = await page.locator('.opening-teacher').evaluate((element) => {
       const board = element.querySelector('.chessboard')!.getBoundingClientRect();
       const button = Array.from(element.querySelectorAll('button'))
@@ -127,7 +132,7 @@ test('an unsavable PGN import preserves the previous course and explains the err
   page,
 }) => {
   await openTeacher(page);
-  await page.getByRole('button', { name: 'Start course', exact: true }).click();
+  await startShortCourse(page);
   const previous = await page.evaluate(() => localStorage.getItem('chess-room.opening-teacher.v1'));
   await page.getByRole('button', { name: 'Openings', exact: true }).click();
   await page.getByRole('tab', { name: 'Import PGN', exact: true }).click();
@@ -161,6 +166,7 @@ test('database search chooses a named Black line and keyboard navigation never b
     name: 'Opening name, variation, or ECO',
     exact: true,
   });
+  await page.getByRole('tab', { name: 'Single lines', exact: true }).click();
   await search.fill('Sicilian Dragon');
   const results = page.getByRole('option');
   await expect(results.first()).toContainText('Sicilian Defense');
@@ -176,6 +182,7 @@ test('database search chooses a named Black line and keyboard navigation never b
   await page.keyboard.press('ArrowLeft');
   await expect(page.getByRole('heading', { name: 'White plays e4', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Openings', exact: true }).click();
+  await page.getByRole('tab', { name: 'Single lines', exact: true }).click();
   await search.fill('B90');
   await page.keyboard.press('ArrowRight');
   await page.getByRole('button', { name: 'Close opening dialog', exact: true }).click();
@@ -210,6 +217,7 @@ test.describe('opening database network recovery', () => {
     await expect(page.getByRole('alert')).toContainText('Opening database unavailable');
     await page.unroute('**/data/*.tsv');
     await page.getByRole('button', { name: 'Retry opening database', exact: true }).click();
+    await page.getByRole('tab', { name: 'Single lines', exact: true }).click();
     await page.getByRole('combobox', { name: 'Opening name, variation, or ECO' }).fill('Sicilian');
     await expect(page.getByRole('option').first()).toBeVisible();
   });

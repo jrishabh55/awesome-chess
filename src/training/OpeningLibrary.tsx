@@ -14,7 +14,9 @@ import type { Color } from '../chess/types';
 import { loadOpeningCatalog, type CatalogOpening } from '../openings/catalog';
 import { openingFamilies, familyName } from '../openings/families';
 import { OpeningCombobox } from './OpeningCombobox';
-import { builtInPacks, importPack, type OpeningPack } from './packs';
+import { importPack, type OpeningPack } from './packs';
+import { CourseBrowser } from './CourseBrowser';
+import type { OpeningCourse } from './courses';
 import { databasePack } from './database';
 import {
   addRepertoireOpening,
@@ -34,13 +36,19 @@ const message = (error: unknown) =>
   error instanceof Error ? error.message : 'This action could not be completed.';
 type LibraryTab = 'browse' | 'repertoires' | 'courses' | 'import';
 const tabs: { id: LibraryTab; name: string }[] = [
-  { id: 'browse', name: 'Browse' },
+  { id: 'browse', name: 'Courses' },
   { id: 'repertoires', name: 'My repertoires' },
-  { id: 'courses', name: 'Guided courses' },
+  { id: 'courses', name: 'Single lines' },
   { id: 'import', name: 'Import PGN' },
 ];
 
-export function OpeningLibrary({ onChoose }: { onChoose: (pack: OpeningPack) => void }) {
+export function OpeningLibrary({
+  onChoose,
+  onChooseCourse,
+}: {
+  onChoose: (pack: OpeningPack) => void;
+  onChooseCourse: (course: OpeningCourse) => void;
+}) {
   const uid = useId();
   const [tab, setTab] = useState<LibraryTab>('browse');
   const [entries, setEntries] = useState<CatalogOpening[]>([]);
@@ -246,12 +254,31 @@ export function OpeningLibrary({ onChoose }: { onChoose: (pack: OpeningPack) => 
           <div className="ol-notice" role="status">
             <Check size={15} />
             <span>{notice}</span>
-            {tab === 'browse' && (
+            {tab === 'courses' && (
               <button onClick={() => changeTab('repertoires')}>View repertoire</button>
             )}
           </div>
         )}
-        {tab === 'browse' && (
+        {tab === 'browse' &&
+          (loading ? (
+            <p className="ot-muted" role="status">
+              Preparing opening courses…
+            </p>
+          ) : loadError ? (
+            <div className="ol-error" role="alert">
+              <p>{loadError}</p>
+              <button className="ot-button" onClick={() => setRetry((value) => value + 1)}>
+                Retry opening database
+              </button>
+            </div>
+          ) : (
+            <CourseBrowser
+              entries={entries}
+              onChoose={onChooseCourse}
+              onChoosePack={(pack) => perform(() => onChoose(pack))}
+            />
+          ))}
+        {tab === 'courses' && (
           <>
             <OpeningCombobox
               entries={entries}
@@ -543,7 +570,7 @@ export function OpeningLibrary({ onChoose }: { onChoose: (pack: OpeningPack) => 
                     disabled={!!storageError}
                     onClick={() => {
                       setTargetId(repertoire.id);
-                      changeTab('browse');
+                      changeTab('courses');
                     }}
                   >
                     <Plus size={16} /> Add variations
@@ -630,7 +657,7 @@ export function OpeningLibrary({ onChoose }: { onChoose: (pack: OpeningPack) => 
                     <small>
                       Create a repertoire for White or Black, then add variations from the database.
                     </small>
-                    <button className="ot-button" onClick={() => changeTab('browse')}>
+                    <button className="ot-button" onClick={() => changeTab('courses')}>
                       Browse opening families
                     </button>
                   </div>
@@ -659,28 +686,6 @@ export function OpeningLibrary({ onChoose }: { onChoose: (pack: OpeningPack) => 
                 </div>
               </>
             )}
-          </>
-        )}
-        {tab === 'courses' && (
-          <>
-            <p className="ot-muted">
-              Ready-made repertoires with strategic explanations, guided variations, and recall
-              drills.
-            </p>
-            <div className="ol-course-list">
-              {builtInPacks.map((pack) => (
-                <section key={pack.id}>
-                  <h3>{pack.name}</h3>
-                  <p>{pack.description}</p>
-                  <small>
-                    Play {sideName(pack.side)} · {pack.lines.length} variations
-                  </small>
-                  <button className="ot-primary" onClick={() => perform(() => onChoose(pack))}>
-                    Start {pack.name}
-                  </button>
-                </section>
-              ))}
-            </div>
           </>
         )}
         {tab === 'import' && (
