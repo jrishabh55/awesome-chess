@@ -2,7 +2,7 @@
 
 [![Deploy to GitHub Pages](https://github.com/jrishabh55/awesome-chess/actions/workflows/pages.yml/badge.svg)](https://github.com/jrishabh55/awesome-chess/actions/workflows/pages.yml)
 
-A local-first chess review PWA with Stockfish 19, a playable analysis board, branching variations, opening recognition, and unlimited reviews. No account, server-side analysis, or AI API key is used.
+A local-first chess PWA with Stockfish 19, unlimited game reviews, opening lessons and recall drills, and adjustable-strength engine games. No account, server-side analysis, or AI API key is used.
 
 **[Open Chess Room](https://jrishabh55.github.io/awesome-chess/)** · [Scoring policy](docs/scoring.md) · [Architecture](docs/architecture.md)
 
@@ -13,6 +13,8 @@ A local-first chess review PWA with Stockfish 19, a playable analysis board, bra
 - Playable sidelines, PGN variations, legal move indicators, board flipping, promotion, colored arrows, and square highlights.
 - Local coach explanations, guided key moments, retry exercises, and visual tactical explanations.
 - Opening names and ECO codes from the Lichess opening database.
+- Opening Teacher with guided variations, progressive randomized drills, custom PGN repertoires, and saved progress.
+- Play Stockfish as White, Black, or a random side, with Skill 0, approximate Elo targets, and full strength. Games resume locally and can be sent straight to review.
 - Local study library, PGN/FEN import, PGN export, JSON backups, and an installable offline PWA.
 
 ## Run locally
@@ -27,7 +29,7 @@ npm run dev
 
 Open the URL printed by Vite. Asset preparation downloads the pinned Lichess opening database and prepares the engine from the pinned npm package. Engine startup shows download progress, verifies and caches the files, and offers retry after a failure. The full Stockfish engine is about 95 MB; the optional Lite build is about 1.7 MB. Assets are served from this project, not a runtime CDN.
 
-On the hosted site, the full engine's first download can take several minutes on a slower connection. The loading panel lets you switch to Lite without waiting. Choose **Settings → Engine build → Lite** for a faster start, or use **Make available offline** to download and verify the full engine with visible progress. Once saved offline, it does not need to download again for each visit.
+On the hosted site, the full engine's first download can take several minutes on a slower connection. The compact engine status shows progress; open Settings for download details and to switch to Lite without waiting. Choose **Settings → Engine build → Lite** for a faster start, or use **Make available offline** to download and verify the full engine with visible progress. Once saved offline, it does not need to download again for each visit.
 
 For the installable/offline app:
 
@@ -44,13 +46,15 @@ Open `http://127.0.0.1:5174`, choose **Settings → Make available offline**, an
 - **Review game:** analyzes the original mainline. Quick review (the default) uses time-limited searches; Deep review uses the selected depth. Live analysis pauses during a review, and restarting an incomplete review resumes completed moves at the same settings. Both players get accuracy, classification counts, phase reports, and an approximate performance estimate when there are enough meaningful decisions.
 - **Analysis:** shows three engine continuations and move-quality feedback. Play a different move from any position to create a sideline. Click a continuation to add it to the tree. Return to game restores the exploration origin.
 - **Board drawings:** right-click toggles a red square, Ctrl + right-click uses orange, and Shift + right-click uses green. Right-drag draws a translucent arrow with the same modifier colors; knight moves use an L shape. Multiple drawings can coexist; the eraser clears your annotations. Use the visible color tools on touch devices or select squares with keyboard focus and Enter. Drawings are saved with the position, including orange in backups and PGN (`O` color code).
-- **Review sidebar:** the move list is the only internal scroller. Playback controls sit below the review card; expand **Accuracy & full report** for both players’ accuracy, classifications, and phase reports.
+- **Review layout:** the main screen fits without scrolling. Move pages resize to the available space and automatically follow keyboard navigation; page controls browse without moving the board. Settings sits beside the final score. **Settings → Full report / Move coach / Game tools** contains detailed reports, explanations, exports, and secondary controls. Settings dialogs may scroll.
 - **Keyboard navigation:** Left / Right move through the selected game or sideline, including after clicking the board or panel controls. Press **X** or use the **Flip board** button below the board to switch sides. Manual navigation pauses playback. Text entry and dialogs keep their own controls.
 - **Game endings:** the final position shows a crown on the winning king and a checkmate, flag, or clock badge on the losing king. Draws mark both kings. Earlier positions and unfinished sidelines do not inherit the original game's result.
 - **Engine arrows:** a suggestion must stay unchanged for 500 ms before appearing or replacing the current arrow. Changing positions clears it immediately; scores and engine lines continue updating live.
-- **Coach:** explains verified local evidence, shows continuations and tactical overlays, and navigates key moments.
+- **Coach:** open **Settings → Move coach**, or **Start guided review**, for explanations, continuations, tactical overlays, and key moments.
 - **Retry:** hides answers while you try a better move. Hint/reveal are optional. A sound equivalent move can pass. Save an attempt as a sideline explicitly.
-- **Library:** reopen local games, export PGN with variations/comments/drawings, or create a lossless JSON backup. Settings also offers FEN copy and per-study backup.
+- **Library:** reopen local games, export PGN with variations/comments/drawings, or create a lossless JSON backup. **Settings → Game tools** provides exports and saved games; Preferences also offers FEN copy and per-study backup.
+- **Opening Teacher:** choose it from the Workspace menu. Each variation starts with a guided tour and arrows. The first tour gets one recall drill; later tours get two shuffled drills including the new variation, then a final shuffled pass covers every variation. Italian, Queen’s Gambit and Caro-Kann courses are bundled. Import your own PGN variations through Openings, choose the side to train, and resume saved progress on this device.
+- **Play Stockfish:** choose it from the Workspace menu and select a side and strength. Stockfish plays locally using its separate Lite worker. **New game** changes setup; **Resign** ends the game; **Review this game** opens the completed game in review. The current game resumes when you return. Elo targets are approximate, not a calibrated Chess.com rating; Skill 0 is the easiest supported setting.
 
 Positive evaluations favor White; negative evaluations favor Black. Mate scores identify the winning color by sign. All move feedback is provisional until its corresponding search finishes and may change with deeper searches.
 
@@ -58,7 +62,7 @@ Positive evaluations favor White; negative evaluations favor Black. Mate scores 
 
 Read [scoring policy](docs/scoring.md) for formulas and limitations. The familiar move labels are this app's own heuristics, not a reproduction of Chess.com's proprietary implementation. Game rating is an uncalibrated single-game estimate, not your real Elo. Coaching is deterministic and based on engine/board evidence; it does not call a language-model service.
 
-The architecture supports future guided opening courses, randomized recall drills, and adjustable-strength engine opponents. Those follow-ups are not included in this review release. Opening identification currently supplies names and ECO codes rather than master-game statistics.
+Opening identification supplies names and ECO codes rather than master-game statistics. Teaching progress and the current engine game are stored separately from the study library. Engine play uses Stockfish’s actual limited-strength best move; review always remains full strength. Skill and Elo controls follow [Stockfish’s documented UCI options](https://official-stockfish.github.io/docs/stockfish-wiki/UCI-Protocol-and-Stockfish-Commands.html).
 
 ## Verify
 

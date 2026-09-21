@@ -15,6 +15,7 @@ export function ReviewPanel({
   onGuide,
   speed,
   onSpeed,
+  onReport,
 }: {
   study: Study;
   assessments: Record<string, MoveAssessment>;
@@ -26,22 +27,25 @@ export function ReviewPanel({
   onGuide: () => void;
   speed: 'quick' | 'deep';
   onSpeed: (speed: 'quick' | 'deep') => void;
+  onReport?: () => void;
 }) {
   const r = buildReport(study, assessments),
     done = r.w.analyzed + r.b.analyzed,
     total = study.mainline.length;
   return (
     <div className="review-content">
-      <div className="review-invitation">
-        <div className="review-coach-icon">
-          <GraduationCap size={32} />
+      {!onReport && (
+        <div className="review-invitation">
+          <div className="review-coach-icon">
+            <GraduationCap size={32} />
+          </div>
+          <p>
+            {done === total && total
+              ? 'Your review is ready. Explore your best moves and the moments where you can improve.'
+              : 'Every move tells a story. Let’s find your best moments and learn from the rest.'}
+          </p>
         </div>
-        <p>
-          {done === total && total
-            ? 'Your review is ready. Explore your best moves and the moments where you can improve.'
-            : 'Every move tells a story. Let’s find your best moments and learn from the rest.'}
-        </p>
-      </div>
+      )}
       <div className="review-highlights" aria-label="Analyzed move highlights">
         {(['Best', 'Excellent', 'Blunder'] as Label[]).map((label) => (
           <span key={label} style={{ color: labelInfo[label].color }}>
@@ -50,18 +54,20 @@ export function ReviewPanel({
           </span>
         ))}
       </div>
-      <label className="review-speed">
-        <span>Review speed</span>
-        <select
-          aria-label="Review speed"
-          value={speed}
-          disabled={reviewing}
-          onChange={(e) => onSpeed(e.target.value as 'quick' | 'deep')}
-        >
-          <option value="quick">Quick · time-limited</option>
-          <option value="deep">Deep · selected depth</option>
-        </select>
-      </label>
+      {!onReport && (
+        <label className="review-speed">
+          <span>Review speed</span>
+          <select
+            aria-label="Review speed"
+            value={speed}
+            disabled={reviewing}
+            onChange={(e) => onSpeed(e.target.value as 'quick' | 'deep')}
+          >
+            <option value="quick">Quick · time-limited</option>
+            <option value="deep">Deep · selected depth</option>
+          </select>
+        </label>
+      )}
       <div className="review-action">
         {reviewing ? (
           <>
@@ -95,129 +101,150 @@ export function ReviewPanel({
           <button className="secondary wide guided-review" onClick={onGuide}>
             <Play size={16} /> Start guided review
           </button>
-          <details className="full-report">
-            <summary>Accuracy &amp; full report</summary>
-            <div className="accuracy-cards">
-              {(['w', 'b'] as Color[]).map((c) => (
-                <div className="accuracy-card" key={c}>
-                  <div className="accuracy-player">
-                    <span className={`side-dot ${c === 'w' ? 'white' : 'black'}`} />
-                    {c === 'w' ? 'White' : 'Black'}
-                    <span className="muted">accuracy</span>
-                  </div>
-                  <strong>
-                    {r[c].accuracy === null ? '—' : r[c].accuracy!.toFixed(1)}
-                    <small>{r[c].accuracy !== null ? '%' : ''}</small>
-                  </strong>
-                  <span className="accuracy-name">
-                    {study.headers[c === 'w' ? 'White' : 'Black'] || 'Unknown player'}
-                  </span>
-                </div>
-              ))}
-            </div>
-            <div className="classification-table">
-              <div className="table-head">
-                <span>White</span>
-                <span>MOVE QUALITY</span>
-                <span>Black</span>
-              </div>
-              {labels.map((l) => (
-                <div className="quality-row" key={l}>
-                  <button
-                    onClick={() => {
-                      const id = study.mainline.find(
-                        (id) => assessments[id]?.mover === 'w' && assessments[id]?.primary === l,
-                      );
-                      if (id) onSelect(id);
-                    }}
-                  >
-                    {r.w.counts[l]}
-                  </button>
-                  <span>
-                    <b style={{ color: labelInfo[l].color }}>
-                      <MoveQualityIcon label={l} />
-                    </b>
-                    {l}
-                  </span>
-                  <button
-                    onClick={() => {
-                      const id = study.mainline.find(
-                        (id) => assessments[id]?.mover === 'b' && assessments[id]?.primary === l,
-                      );
-                      if (id) onSelect(id);
-                    }}
-                  >
-                    {r.b.counts[l]}
-                  </button>
-                </div>
-              ))}
-            </div>
-            <div className="report-card">
-              <div className="section-heading">
-                <span>GAME REPORT</span>
-                <span>White / Black</span>
-              </div>
-              {(['opening', 'middlegame', 'endgame'] as Phase[]).map((phase) => (
-                <div className="phase-row" key={phase}>
-                  <span>{phase[0].toUpperCase() + phase.slice(1)}</span>
-                  {(['w', 'b'] as Color[]).map((c) => (
-                    <span
-                      key={c}
-                      title={`${r[c].phases[phase].analyzed}/${r[c].phases[phase].total} analyzed · ${r[c].phases[phase].errors} errors`}
-                    >
-                      {!r[c].phases[phase].reached
-                        ? 'Not reached'
-                        : r[c].phases[phase].accuracy === null
-                          ? 'Pending'
-                          : r[c].phases[phase].accuracy!.toFixed(0) + '%'}
-                    </span>
-                  ))}
-                </div>
-              ))}
-              <div className="phase-row rating">
-                <span>Game rating</span>
-                {(['w', 'b'] as Color[]).map((c) => (
-                  <strong key={c}>
-                    {r[c].performance === null ? '—' : `≈${r[c].performance}`}
-                  </strong>
-                ))}
-              </div>
-              <p className="fine-print">
-                Uncalibrated performance estimate, not your player rating. At least 6 meaningful
-                decisions are needed.
-                {(r.w.decisions < 12 || r.b.decisions < 12) &&
-                  ' Limited sample: use this as feedback, not a strength measurement.'}
-              </p>
-              <details className="phase-details">
-                <summary>Phase insights</summary>
-                {(['opening', 'middlegame', 'endgame'] as Phase[]).map((phase) => (
-                  <div key={phase}>
-                    <strong>{phase[0].toUpperCase() + phase.slice(1)}</strong>
-                    {(['w', 'b'] as Color[]).map((c) => {
-                      const p = r[c].phases[phase];
-                      return (
-                        <div key={c}>
-                          <span>
-                            {c === 'w' ? 'White' : 'Black'} ·{' '}
-                            {p.reached
-                              ? `${p.analyzed}/${p.total} moves analyzed · ${p.errors} errors`
-                              : 'Not reached'}
-                          </span>
-                          {p.highlight && (
-                            <button onClick={() => onSelect(p.highlight!)}>
-                              Strongest analyzed move: {study.nodes[p.highlight].san} →
-                            </button>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ))}
-              </details>
-            </div>
-          </details>
+          {onReport ? (
+            <button className="text-button report-link" onClick={onReport}>
+              Accuracy &amp; full report
+            </button>
+          ) : (
+            <details className="full-report">
+              <summary>Accuracy &amp; full report</summary>
+              <ReviewReport study={study} assessments={assessments} onSelect={onSelect} />
+            </details>
+          )}
         </>
       )}
+    </div>
+  );
+}
+
+export function ReviewReport({
+  study,
+  assessments,
+  onSelect,
+}: {
+  study: Study;
+  assessments: Record<string, MoveAssessment>;
+  onSelect: (id: string) => void;
+}) {
+  const r = buildReport(study, assessments);
+  return (
+    <div className="review-report">
+      <div className="accuracy-cards">
+        {(['w', 'b'] as Color[]).map((c) => (
+          <div className="accuracy-card" key={c}>
+            <div className="accuracy-player">
+              <span className={`side-dot ${c === 'w' ? 'white' : 'black'}`} />
+              {c === 'w' ? 'White' : 'Black'}
+              <span className="muted">accuracy</span>
+            </div>
+            <strong>
+              {r[c].accuracy === null ? '—' : r[c].accuracy!.toFixed(1)}
+              <small>{r[c].accuracy !== null ? '%' : ''}</small>
+            </strong>
+            <span className="accuracy-name">
+              {study.headers[c === 'w' ? 'White' : 'Black'] || 'Unknown player'}
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="classification-table">
+        <div className="table-head">
+          <span>White</span>
+          <span>MOVE QUALITY</span>
+          <span>Black</span>
+        </div>
+        {labels.map((l) => (
+          <div className="quality-row" key={l}>
+            <button
+              onClick={() => {
+                const id = study.mainline.find(
+                  (id) => assessments[id]?.mover === 'w' && assessments[id]?.primary === l,
+                );
+                if (id) onSelect(id);
+              }}
+            >
+              {r.w.counts[l]}
+            </button>
+            <span>
+              <b style={{ color: labelInfo[l].color }}>
+                <MoveQualityIcon label={l} />
+              </b>
+              {l}
+            </span>
+            <button
+              onClick={() => {
+                const id = study.mainline.find(
+                  (id) => assessments[id]?.mover === 'b' && assessments[id]?.primary === l,
+                );
+                if (id) onSelect(id);
+              }}
+            >
+              {r.b.counts[l]}
+            </button>
+          </div>
+        ))}
+      </div>
+      <div className="report-card">
+        <div className="section-heading">
+          <span>GAME REPORT</span>
+          <span>White / Black</span>
+        </div>
+        {(['opening', 'middlegame', 'endgame'] as Phase[]).map((phase) => (
+          <div className="phase-row" key={phase}>
+            <span>{phase[0].toUpperCase() + phase.slice(1)}</span>
+            {(['w', 'b'] as Color[]).map((c) => (
+              <span
+                key={c}
+                title={`${r[c].phases[phase].analyzed}/${r[c].phases[phase].total} analyzed · ${r[c].phases[phase].errors} errors`}
+              >
+                {!r[c].phases[phase].reached
+                  ? 'Not reached'
+                  : r[c].phases[phase].accuracy === null
+                    ? 'Pending'
+                    : r[c].phases[phase].accuracy!.toFixed(0) + '%'}
+              </span>
+            ))}
+          </div>
+        ))}
+        <div className="phase-row rating">
+          <span>Game rating</span>
+          {(['w', 'b'] as Color[]).map((c) => (
+            <strong key={c}>{r[c].performance === null ? '—' : `≈${r[c].performance}`}</strong>
+          ))}
+        </div>
+        <p className="fine-print">
+          Uncalibrated performance estimate, not your player rating. At least 6 meaningful decisions
+          are needed.
+          {(r.w.decisions < 12 || r.b.decisions < 12) &&
+            ' Limited sample: use this as feedback, not a strength measurement.'}
+        </p>
+        <details className="phase-details">
+          <summary>Phase insights</summary>
+          {(['opening', 'middlegame', 'endgame'] as Phase[]).map((phase) => (
+            <div key={phase}>
+              <strong>{phase[0].toUpperCase() + phase.slice(1)}</strong>
+              {(['w', 'b'] as Color[]).map((c) => {
+                const p = r[c].phases[phase];
+                return (
+                  <div key={c}>
+                    <span>
+                      {c === 'w' ? 'White' : 'Black'} ·{' '}
+                      {p.reached
+                        ? `${p.analyzed}/${p.total} moves analyzed · ${p.errors} errors`
+                        : 'Not reached'}
+                    </span>
+                    {p.highlight && (
+                      <button onClick={() => onSelect(p.highlight!)}>
+                        Strongest analyzed move: {study.nodes[p.highlight].san} →
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </details>
+      </div>
     </div>
   );
 }

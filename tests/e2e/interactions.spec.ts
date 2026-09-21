@@ -20,10 +20,13 @@ test('arrow keys navigate after board clicks, annotations, and focused panel con
   await page.getByRole('gridcell', { name: 'a3 empty', exact: true }).click({ button: 'right' });
   await page.keyboard.press('ArrowLeft');
   await expect(page.getByRole('gridcell', { name: 'e2 white pawn', exact: true })).toBeVisible();
-  await page.getByRole('combobox', { name: 'Review speed' }).focus();
+  await page.getByRole('switch', { name: 'Engine analysis' }).focus();
   await page.keyboard.press('ArrowRight');
   await expect(page.getByRole('gridcell', { name: 'e4 white pawn', exact: true })).toBeVisible();
-  await expect(page.getByRole('combobox', { name: 'Review speed' })).toHaveValue('quick');
+  await expect(page.getByRole('switch', { name: 'Engine analysis' })).toHaveAttribute(
+    'aria-checked',
+    'false',
+  );
 });
 
 test('keyboard navigation follows a played sideline and preserves text editing', async ({
@@ -182,7 +185,7 @@ test('moves precede the report and move-quality badges use real icons', async ({
         ),
     )
     .toBe(true);
-  await page.getByText('Accuracy & full report', { exact: true }).click();
+  await page.getByRole('button', { name: 'Close dialog' }).click();
   await expect(page.locator('.eval-chart')).toHaveCount(0);
   expect(
     await page
@@ -244,9 +247,11 @@ test('download progress is visible and switching to Lite cancels the large downl
   try {
     await page.goto('./');
     await expect(page.getByRole('progressbar', { name: 'Engine download progress' })).toBeVisible();
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await expect(page.getByText(/MB · Saved for future visits/)).toBeVisible();
     await page.getByRole('button', { name: 'Use Lite · smaller download', exact: true }).click();
     release();
+    await page.getByRole('button', { name: 'Close dialog' }).click();
     await page.getByRole('tab', { name: 'Analysis', exact: true }).click();
     await expect(page.locator('.engine-line')).toHaveCount(3, { timeout: 90000 });
     await expect(page.locator('.engine-status small')).toHaveText('Lite');

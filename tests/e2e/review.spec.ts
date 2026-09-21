@@ -37,7 +37,7 @@ test('imports a short completed game and reviews both players', async ({ page })
   await page.getByText('Accuracy & full report', { exact: true }).click();
   await expect(page.locator('.accuracy-card').first()).toBeVisible();
   await expect(page.locator('.accuracy-card strong').first()).not.toHaveText('—');
-  await page.getByText('Accuracy & full report', { exact: true }).click();
+  await page.getByRole('button', { name: 'Close dialog' }).click();
   await page.getByRole('button', { name: 'Start guided review' }).click();
   await expect(page.locator('.coach-card')).toBeVisible();
   const retry = page.getByRole('button', { name: 'Retry move', exact: true });
@@ -71,7 +71,7 @@ test('engine arrows settle after navigation and pending suggestions stop when pa
   page,
 }) => {
   await page.goto('./');
-  await page.getByRole('button', { name: 'Engine settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('combobox', { name: 'Engine build' }).selectOption('lite');
   await page.getByRole('button', { name: 'Close dialog' }).click();
   const arrow = page.locator('.annotation-arrow');

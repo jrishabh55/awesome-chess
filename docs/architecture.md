@@ -12,6 +12,8 @@
 
 `src/offline` verifies engine assets by SHA-256 before committing an offline-ready set. The production service worker precaches the application and opening data, and routes engine requests to an explicitly matching build. User studies are never stored in, or removed with, asset caches. App updates wait for user action after a successful save.
 
-`src/app` coordinates UI state and feature controllers. Temporary demonstrations and retries own their positions without changing the study cursor. Displayed engine results must match the selected root/history even when engine analysis is paused.
+`src/app/WorkspaceApp` mounts one workspace at a time so review and opponent workers do not compete. Review state is saved before switching modes. The review surface is bounded by the viewport, moves are paginated, and Settings holds scrollable secondary content. `src/app` coordinates UI state and feature controllers. Temporary demonstrations and retries own their positions without changing the study cursor. Displayed engine results must match the selected root/history even when engine analysis is paused.
 
-Future teaching can store authored lesson trees and node-level overlays alongside separate drill progress. Future opponent play can use the same board and UCI adapter with an independent strength profile; full-strength review remains separate. Neither requires adding a remote dependency.
+`src/training` owns legal opening packs, PGN leaf-line import, annotated guided tours, and a pure staged drill scheduler. Progress includes a validated pack/session snapshot in localStorage; imported courses work offline.
+
+`src/play` owns the opponent-game model and a separate UCI client. Each game has independent strength settings; the client returns UCI `bestmove` instead of inferring it from principal variations. Canceled workers are disposed so late replies cannot enter a new game. Validated legal history and settings are saved locally, and completed games become normal review studies. Full-strength review uses its original independent client.

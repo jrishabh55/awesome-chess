@@ -6,7 +6,7 @@ test('PWA reloads and runs real Stockfish plus reviews with networking disabled'
 }) => {
   await page.goto('./');
   await page.evaluate(() => navigator.serviceWorker.ready);
-  await page.getByRole('button', { name: 'Engine settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('combobox', { name: 'Engine build' }).selectOption('lite');
   await page.getByRole('button', { name: 'Make available offline', exact: true }).click();
   await expect(page.getByText('Engine ready offline', { exact: true })).toBeVisible();
@@ -48,7 +48,7 @@ test('PWA reloads and runs real Stockfish plus reviews with networking disabled'
       ),
     )
     .toBe(true);
-  await page.getByText('Accuracy & full report', { exact: true }).click();
+  await page.getByRole('button', { name: 'Close dialog' }).click();
   await page.getByRole('button', { name: 'Review again', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Review again', exact: true })).toBeVisible({
     timeout: 100000,
@@ -57,7 +57,7 @@ test('PWA reloads and runs real Stockfish plus reviews with networking disabled'
 test('failed engine download never reports offline readiness', async ({ page, context }) => {
   await page.goto('./');
   await page.evaluate(() => navigator.serviceWorker.ready);
-  await page.getByRole('button', { name: 'Engine settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('combobox', { name: 'Engine build' }).selectOption('lite');
   await context.setOffline(true);
   await page.getByRole('button', { name: 'Make available offline', exact: true }).click();

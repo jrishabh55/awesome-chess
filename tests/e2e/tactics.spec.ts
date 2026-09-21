@@ -8,11 +8,15 @@ test('recognizes a verified queen sacrifice ending in forced mate', async ({ pag
       '[SetUp "1"]\n[FEN "4kb1r/p2n1ppp/4q3/4p1B1/4P3/1Q6/PPP2PPP/2KR4 w k - 0 16"]\n\n16. Qb8+ Nxb8 17. Rd8# 1-0',
     );
   await page.getByRole('button', { name: 'Import & explore' }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('combobox', { name: 'Review speed' }).selectOption('deep');
+  await page.getByRole('button', { name: 'Close dialog' }).click();
   await page.getByRole('button', { name: 'Game Review', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Review again', exact: true })).toBeVisible({
     timeout: 100000,
   });
   await page.getByRole('button', { name: 'Qb8+', exact: true }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Move coach', exact: true }).click();
   await expect(page.locator('.coach-card h3')).toContainText('Brilliant');
 });

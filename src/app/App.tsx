@@ -58,7 +58,7 @@ import { assessMove, sanLine } from '../review/classify';
 import type { MoveAssessment, Evidence } from '../review/policy';
 import { MoveList } from '../review/MoveList';
 import { AnalysisPanel } from '../review/AnalysisPanel';
-import { ReviewPanel } from '../review/ReviewPanel';
+import { ReviewPanel, ReviewReport } from '../review/ReviewPanel';
 import { CoachCard } from '../coach/CoachCard';
 import { keyMoments } from '../coach/explain';
 import { startRetry, submitRetry, type RetrySession } from '../retry/session';
@@ -83,6 +83,7 @@ import {
 } from '../offline/download';
 import './styles.css';
 import './review-sidebar.css';
+import './compact-workspace.css';
 const errorMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const saveFile = (name: string, text: string, type = 'text/plain') => {
   const url = URL.createObjectURL(new Blob([text], { type }));
@@ -98,8 +99,15 @@ interface Demo {
   index: number;
   frames: Evidence['frames'];
 }
-export default function App() {
+export default function App({
+  onWorkspaceChange,
+  initialStudy,
+}: {
+  onWorkspaceChange?: (mode: 'review' | 'teacher' | 'play') => void;
+  initialStudy?: Study;
+} = {}) {
   const [study, setStudy] = useState<Study>(() => {
+    if (initialStudy) return initialStudy;
     const s = parsePgn(samplePgn)[0];
     return selectNode(s, s.mainline[17]);
   });
@@ -108,6 +116,11 @@ export default function App() {
     [modal, setModal] = useState<'import' | 'library' | 'settings' | 'scoring' | null>(null),
     [input, setInput] = useState(''),
     [importGames, setImportGames] = useState<Study[]>([]);
+  const [settingsTab, setSettingsTab] = useState<'engine' | 'report' | 'coach' | 'tools'>('engine');
+  const openSettings = (section: typeof settingsTab = 'engine') => {
+    setSettingsTab(section);
+    setModal('settings');
+  };
   const [tab, setTab] = useState<'review' | 'analysis' | 'openings'>('review'),
     [orientation, setOrientation] = useState<Color>('w'),
     [mode, setMode] = useState<'move' | 'arrow' | 'square'>('move'),
@@ -183,7 +196,7 @@ export default function App() {
       .then(([all, id, settings]) => {
         if (!active) return;
         setLibrary(all);
-        const s = all.find((x) => x.id === id) || all[0];
+        const s = initialStudy || all.find((x) => x.id === id) || all[0];
         if (s) setStudy(s);
         if (settings) {
           setFlavor(settings.flavor);
@@ -744,8 +757,186 @@ export default function App() {
       setDownloadProgress(null);
     }
   };
+  const switchWorkspace = async (next: 'review' | 'teacher' | 'play') => {
+    if (next === 'review' || !onWorkspaceChange) return;
+    try {
+      const snapshot = currentStudy.current;
+      await saveStudy(snapshot);
+      await setPreference('activeStudy', snapshot.id);
+      if (analysisLoaded.current && Object.keys(assessmentRef.current).length)
+        await saveAnalysis(snapshot.id, {
+          flavor,
+          engineBuild: ENGINE_BUILD_ID,
+          records: assessmentRef.current,
+        });
+      engineAbort.current?.abort();
+      reviewAbort.current?.abort();
+      retryAbort.current?.abort();
+      onWorkspaceChange(next);
+    } catch (error) {
+      setError(`Could not save before switching: ${errorMessage(error)}`);
+    }
+  };
+  const engineDownloadDetails = engineLoad.phase !== 'ready' && (engineOn || reviewing) && (
+    <div className={`engine-loader ${engineLoad.phase}`} role="status" aria-live="polite">
+      <div className="engine-loader-title">
+        {engineLoad.phase === 'error' ? (
+          <Info size={18} />
+        ) : (
+          <LoaderCircle className="spin" size={18} />
+        )}
+        <strong>
+          {engineLoad.phase === 'error'
+            ? 'Engine could not start'
+            : engineLoad.phase === 'downloading'
+              ? engineLoad.loaded === engineLoad.total
+                ? 'Verifying engine…'
+                : 'Downloading Stockfish…'
+              : engineLoad.phase === 'starting'
+                ? 'Starting Stockfish…'
+                : 'Preparing Stockfish…'}
+        </strong>
+        {engineLoad.total > 0 && (
+          <span>{Math.round((engineLoad.loaded / engineLoad.total) * 100)}%</span>
+        )}
+      </div>
+      {engineLoad.total > 0 && (
+        <>
+          <progress
+            aria-label="Engine download progress"
+            value={engineLoad.loaded}
+            max={engineLoad.total}
+          />
+          <small>
+            {(engineLoad.loaded / 1048576).toFixed(1)} / {(engineLoad.total / 1048576).toFixed(1)}{' '}
+            MB · Saved for future visits
+          </small>
+        </>
+      )}
+      {engineLoad.phase === 'error' ? (
+        <>
+          <p>{engineLoad.error}</p>
+          <button className="secondary" onClick={retryEngine}>
+            <RotateCcw size={15} /> Retry engine
+          </button>
+        </>
+      ) : (
+        <p>You can explore the board while the engine loads.</p>
+      )}
+      {flavor === 'full' && engineLoad.phase !== 'starting' && (
+        <button
+          className="text-button"
+          onClick={() => {
+            reviewAbort.current?.abort();
+            setReviewing(false);
+            setError('');
+            setFlavor('lite');
+          }}
+        >
+          Use Lite · smaller download
+        </button>
+      )}
+    </div>
+  );
+  const retryControls = retry && (
+    <div className="retry-card">
+      <div className="section-heading">
+        <span>TRY AGAIN</span>
+        <button
+          className="text-button"
+          onClick={() => {
+            retryAbort.current?.abort();
+            setRetry(null);
+            setRetryBusy(false);
+          }}
+        >
+          Exit retry
+          <X size={14} />
+        </button>
+      </div>
+      <h3>
+        {retryBusy
+          ? 'Checking your move…'
+          : retryAccepted === true
+            ? 'That’s a strong continuation!'
+            : retryAccepted === false
+              ? 'There’s a better move here.'
+              : 'Can you find a better move?'}
+      </h3>
+      <p>
+        {retry.feedback
+          ? `${retry.feedback.primary} · ${retry.hints || retry.revealed ? 'Assisted attempt' : 'Unaided attempt'}`
+          : 'Play your choice on the board. The engine’s answer is hidden.'}
+      </p>
+      <div className="coach-actions">
+        <button
+          className="secondary"
+          onClick={() => {
+            setRetry((r) => (r ? { ...r, attempt: null, feedback: null } : null));
+            setRetryAccepted(null);
+          }}
+        >
+          Try again
+        </button>
+        <button
+          className="text-button"
+          onClick={() => {
+            setRetry((r) => (r ? { ...r, hints: r.hints + 1 } : null));
+            const best = assessments[retry.originId]?.bestUci;
+            setToast(
+              best
+                ? `Look for a move with the piece on ${best.slice(0, 2)}.`
+                : 'Look for forcing moves: checks, captures, and threats.',
+            );
+          }}
+        >
+          Hint
+        </button>
+        <button
+          className="text-button"
+          onClick={() => setRetry((r) => (r ? { ...r, revealed: true } : null))}
+        >
+          Reveal best move
+        </button>
+        {retry.attempt && (
+          <button className="text-button" disabled={retryBusy} onClick={retryReply}>
+            Play engine reply
+          </button>
+        )}
+        {retry.attempt && (
+          <button
+            className="text-button"
+            onClick={() => {
+              setStudy(retry.attempt!);
+              setRetry(null);
+              setTab('analysis');
+            }}
+          >
+            Save as sideline
+            <ArrowUpRight size={15} />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+  const coachDetails = !retry && !demo && showCoach && selectedAssessment && (
+    <CoachCard
+      assessment={selectedAssessment}
+      san={study.nodes[study.selectedId].san || ''}
+      onRetry={() => {
+        setModal(null);
+        beginRetry();
+      }}
+      onShow={() => {
+        setModal(null);
+        showDemo();
+      }}
+      onNext={() => jumpMoment(1)}
+      onPrevious={() => jumpMoment(-1)}
+    />
+  );
   return (
-    <div className="app-shell">
+    <div className="app-shell compact-review">
       <aside className="sidebar">
         <a className="brand-mark" href="#" aria-label="Chess Room home">
           <img src={assetUrl('assets/icon.svg')} alt="" />
@@ -781,7 +972,7 @@ export default function App() {
           </button>
         </div>
         <div className="sidebar-bottom">
-          <button className="nav-item" title="Settings" onClick={() => setModal('settings')}>
+          <button className="nav-item" title="Settings" onClick={() => openSettings()}>
             <Settings2 size={21} />
             <span>Settings</span>
           </button>
@@ -798,16 +989,29 @@ export default function App() {
               Game review<span className="beta-tag">LOCAL FIRST</span>
             </h1>
           </div>
-          <button
-            className="import-button"
-            onClick={() => {
-              setModal('import');
-              setError('');
-            }}
-          >
-            <Upload size={17} />
-            Import game
-          </button>
+          <div className="header-actions">
+            <select
+              aria-label="Workspace"
+              value="review"
+              onChange={(event) =>
+                void switchWorkspace(event.target.value as 'review' | 'teacher' | 'play')
+              }
+            >
+              <option value="review">Game review</option>
+              <option value="teacher">Opening teacher</option>
+              <option value="play">Play Stockfish</option>
+            </select>
+            <button
+              className="import-button"
+              onClick={() => {
+                setModal('import');
+                setError('');
+              }}
+            >
+              <Upload size={17} />
+              <span>Import game</span>
+            </button>
+          </div>
         </header>
         {error && (
           <div className="error-banner" role="alert">
@@ -950,7 +1154,7 @@ export default function App() {
                 <button
                   title="Board settings"
                   aria-label="Board settings"
-                  onClick={() => setModal('settings')}
+                  onClick={() => openSettings()}
                 >
                   <Settings2 size={18} />
                 </button>
@@ -994,99 +1198,27 @@ export default function App() {
                 </button>
               </div>
             )}
-            {retry && (
-              <div className="retry-card">
-                <div className="section-heading">
-                  <span>TRY AGAIN</span>
-                  <button
-                    className="text-button"
-                    onClick={() => {
-                      retryAbort.current?.abort();
-                      setRetry(null);
-                      setRetryBusy(false);
-                    }}
-                  >
-                    Exit retry
-                    <X size={14} />
-                  </button>
-                </div>
-                <h3>
-                  {retryBusy
-                    ? 'Checking your move…'
-                    : retryAccepted === true
-                      ? 'That’s a strong continuation!'
-                      : retryAccepted === false
-                        ? 'There’s a better move here.'
-                        : 'Can you find a better move?'}
-                </h3>
-                <p>
-                  {retry.feedback
-                    ? `${retry.feedback.primary} · ${retry.hints || retry.revealed ? 'Assisted attempt' : 'Unaided attempt'}`
-                    : 'Play your choice on the board. The engine’s answer is hidden.'}
-                </p>
-                <div className="coach-actions">
-                  <button
-                    className="secondary"
-                    onClick={() => {
-                      setRetry((r) => (r ? { ...r, attempt: null, feedback: null } : null));
-                      setRetryAccepted(null);
-                    }}
-                  >
-                    Try again
-                  </button>
-                  <button
-                    className="text-button"
-                    onClick={() => {
-                      setRetry((r) => (r ? { ...r, hints: r.hints + 1 } : null));
-                      const best = assessments[retry.originId]?.bestUci;
-                      setToast(
-                        best
-                          ? `Look for a move with the piece on ${best.slice(0, 2)}.`
-                          : 'Look for forcing moves: checks, captures, and threats.',
-                      );
-                    }}
-                  >
-                    Hint
-                  </button>
-                  <button
-                    className="text-button"
-                    onClick={() => setRetry((r) => (r ? { ...r, revealed: true } : null))}
-                  >
-                    Reveal best move
-                  </button>
-                  {retry.attempt && (
-                    <button className="text-button" disabled={retryBusy} onClick={retryReply}>
-                      Play engine reply
-                    </button>
-                  )}
-                  {retry.attempt && (
-                    <button
-                      className="text-button"
-                      onClick={() => {
-                        setStudy(retry.attempt!);
-                        setRetry(null);
-                        setTab('analysis');
-                      }}
-                    >
-                      Save as sideline
-                      <ArrowUpRight size={15} />
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-            {!retry && !demo && showCoach && selectedAssessment && (
-              <CoachCard
-                assessment={selectedAssessment}
-                san={study.nodes[study.selectedId].san || ''}
-                onRetry={beginRetry}
-                onShow={showDemo}
-                onNext={() => jumpMoment(1)}
-                onPrevious={() => jumpMoment(-1)}
-              />
-            )}
           </section>
           <section className="analysis-column">
+            <div className="review-topline">
+              <span>
+                <strong>
+                  {study.headers.Result && study.headers.Result !== '*'
+                    ? study.headers.Result
+                    : 'Game review'}
+                </strong>
+                <small>{study.headers.Event || 'Personal study'}</small>
+              </span>
+              <button
+                className="settings-top-button"
+                aria-label="Settings"
+                title="Settings, full report and tools"
+                onClick={() => openSettings()}
+              >
+                <Settings2 size={18} />
+                <span>Settings</span>
+              </button>
+            </div>
             <div className="panel-tabs" role="tablist">
               {(['review', 'analysis', 'openings'] as const).map((t) => (
                 <button
@@ -1132,76 +1264,31 @@ export default function App() {
                         : engineStatus
                     : 'Paused'}
               </div>
-              <button
-                className="icon-button"
-                title="Engine settings"
-                aria-label="Engine settings"
-                onClick={() => setModal('settings')}
-              >
-                <Settings2 size={16} />
-              </button>
+              {engineLoad.phase === 'error' && engineOn ? (
+                <button className="engine-retry" onClick={retryEngine} aria-label="Retry engine">
+                  <RotateCcw size={14} />
+                  Retry
+                </button>
+              ) : engineLoad.phase !== 'ready' && engineOn ? (
+                <button
+                  className="engine-download-details"
+                  onClick={() => openSettings()}
+                  aria-label="Engine download details"
+                >
+                  {engineLoad.total
+                    ? Math.round((engineLoad.loaded / engineLoad.total) * 100) + '%'
+                    : 'Details'}
+                </button>
+              ) : null}
+              {engineLoad.total > 0 && engineLoad.phase === 'downloading' && (
+                <progress
+                  className="engine-inline-progress"
+                  aria-label="Engine download progress"
+                  value={engineLoad.loaded}
+                  max={engineLoad.total}
+                />
+              )}
             </div>
-            {engineLoad.phase !== 'ready' && (engineOn || reviewing) && (
-              <div className={`engine-loader ${engineLoad.phase}`} role="status" aria-live="polite">
-                <div className="engine-loader-title">
-                  {engineLoad.phase === 'error' ? (
-                    <Info size={18} />
-                  ) : (
-                    <LoaderCircle className="spin" size={18} />
-                  )}
-                  <strong>
-                    {engineLoad.phase === 'error'
-                      ? 'Engine could not start'
-                      : engineLoad.phase === 'downloading'
-                        ? engineLoad.loaded === engineLoad.total
-                          ? 'Verifying engine…'
-                          : 'Downloading Stockfish…'
-                        : engineLoad.phase === 'starting'
-                          ? 'Starting Stockfish…'
-                          : 'Preparing Stockfish…'}
-                  </strong>
-                  {engineLoad.total > 0 && (
-                    <span>{Math.round((engineLoad.loaded / engineLoad.total) * 100)}%</span>
-                  )}
-                </div>
-                {engineLoad.total > 0 && (
-                  <>
-                    <progress
-                      aria-label="Engine download progress"
-                      value={engineLoad.loaded}
-                      max={engineLoad.total}
-                    />
-                    <small>
-                      {(engineLoad.loaded / 1048576).toFixed(1)} /{' '}
-                      {(engineLoad.total / 1048576).toFixed(1)} MB · Saved for future visits
-                    </small>
-                  </>
-                )}
-                {engineLoad.phase === 'error' ? (
-                  <>
-                    <p>{engineLoad.error}</p>
-                    <button className="secondary" onClick={retryEngine}>
-                      <RotateCcw size={15} /> Retry engine
-                    </button>
-                  </>
-                ) : (
-                  <p>You can explore the board while the engine loads.</p>
-                )}
-                {flavor === 'full' && engineLoad.phase !== 'starting' && (
-                  <button
-                    className="text-button"
-                    onClick={() => {
-                      reviewAbort.current?.abort();
-                      setReviewing(false);
-                      setError('');
-                      setFlavor('lite');
-                    }}
-                  >
-                    Use Lite · smaller download
-                  </button>
-                )}
-              </div>
-            )}
             <div className="moves-heading">
               <span className="current-opening">
                 <BookOpen size={18} />
@@ -1222,7 +1309,9 @@ export default function App() {
               hidden={Boolean(retry)}
             />
             <div className="panel-body">
-              {tab === 'review' && !retry ? (
+              {retry ? (
+                retryControls
+              ) : tab === 'review' ? (
                 <ReviewPanel
                   study={study}
                   assessments={assessments}
@@ -1230,6 +1319,7 @@ export default function App() {
                   completed={reviewCompleted}
                   speed={reviewSpeed}
                   onSpeed={setReviewSpeed}
+                  onReport={() => openSettings('report')}
                   onReview={runReview}
                   onStop={() => {
                     reviewAbort.current?.abort();
@@ -1238,11 +1328,12 @@ export default function App() {
                   onSelect={navigate}
                   onGuide={() => {
                     setShowCoach(true);
+                    openSettings('coach');
                     const id = keyMoments(study, assessments, reviewAs)[0];
                     if (id) navigate(id);
                   }}
                 />
-              ) : tab === 'openings' && !retry ? (
+              ) : tab === 'openings' ? (
                 <div className="opening-panel">
                   <div className="opening-icon">
                     <BookOpen size={30} />
@@ -1270,16 +1361,10 @@ export default function App() {
                       <ChevronRight size={16} />
                     </button>
                   )}
-                  <div className="opening-note">
-                    <GraduationCap size={22} />
-                    <div>
-                      <strong>Build understanding, move by move.</strong>
-                      <p>
-                        Explore a different response on the board. Opening recognition follows your
-                        sideline too.
-                      </p>
-                    </div>
-                  </div>
+                  <button className="secondary wide" onClick={() => switchWorkspace('teacher')}>
+                    <GraduationCap size={18} />
+                    Open opening teacher
+                  </button>
                 </div>
               ) : (
                 <AnalysisPanel
@@ -1324,16 +1409,6 @@ export default function App() {
                 disabled={Boolean(retry)}
               >
                 <ChevronsRight size={23} />
-              </button>
-            </div>
-            <div className="panel-footer">
-              <button onClick={() => saveFile('chess-room.pgn', exportPgn(study))}>
-                <Download size={14} />
-                Export PGN
-              </button>
-              <button onClick={() => setModal('scoring')}>
-                <Info size={14} />
-                How we score
               </button>
             </div>
           </section>
@@ -1469,144 +1544,238 @@ export default function App() {
             )}
             {modal === 'settings' && (
               <>
-                <div className="setting-row">
-                  <div>
-                    <strong>Engine</strong>
-                    <small>Full strength or a smaller, faster download</small>
-                  </div>
-                  <select
-                    aria-label="Engine build"
-                    disabled={downloadProgress !== null}
-                    value={flavor}
-                    onChange={(e) => {
-                      reviewAbort.current?.abort();
-                      setReviewing(false);
-                      setFlavor(e.target.value as EngineFlavor);
-                    }}
-                  >
-                    <option value="full">Stockfish 19 · Full</option>
-                    <option value="lite">Stockfish 19 · Lite</option>
-                  </select>
-                </div>
-                <div className="setting-row">
-                  <div>
-                    <strong>Analysis depth</strong>
-                    <small>Higher depth takes longer on your device</small>
-                  </div>
-                  <input
-                    type="number"
-                    aria-label="Analysis depth"
-                    min="1"
-                    max="50"
-                    value={depth}
-                    onChange={(e) => {
-                      const n = Number(e.target.value);
-                      if (Number.isInteger(n) && n >= 1 && n <= 50) setDepth(n);
-                    }}
-                  />
-                </div>
-                <div className="depth-presets">
-                  {[12, 16, 20].map((d) => (
+                <nav className="settings-tabs" aria-label="Settings sections">
+                  {(['engine', 'report', 'coach', 'tools'] as const).map((section) => (
                     <button
-                      className={depth === d ? 'selected' : ''}
-                      key={d}
-                      onClick={() => setDepth(d)}
+                      key={section}
+                      className={settingsTab === section ? 'active' : ''}
+                      onClick={() => setSettingsTab(section)}
                     >
-                      {d === 12 ? 'Quick' : d === 16 ? 'Balanced' : 'Deep'}
-                      <small>Depth {d}</small>
+                      {section === 'engine'
+                        ? 'Preferences'
+                        : section === 'report'
+                          ? 'Full report'
+                          : section === 'coach'
+                            ? 'Move coach'
+                            : 'Game tools'}
                     </button>
                   ))}
-                </div>
-                {[
-                  ['Continuous analysis', infinite, () => setInfinite((v) => !v)],
-                  ['Show best-move arrow', showArrow, () => setShowArrow((v) => !v)],
-                  ['Show move badges', showBadge, () => setShowBadge((v) => !v)],
-                  ['Show review coach', showCoach, () => setShowCoach((v) => !v)],
-                ].map(([label, value, fn]) => (
-                  <label className="setting-row" key={String(label)}>
-                    <strong>{String(label)}</strong>
-                    <input type="checkbox" checked={Boolean(value)} onChange={fn as () => void} />
-                  </label>
-                ))}
-                <div className="setting-row">
-                  <strong>Review perspective</strong>
-                  <select value={reviewAs} onChange={(e) => setReviewAs(e.target.value as any)}>
-                    <option value="both">Both players</option>
-                    <option value="w">White</option>
-                    <option value="b">Black</option>
-                  </select>
-                </div>
-                <div className="offline-card">
-                  <WifiOff size={22} />
-                  <div>
-                    <strong>
-                      {offlineReady ? 'Engine ready offline' : 'Take your analysis offline'}
-                    </strong>
+                </nav>
+                {settingsTab === 'engine' && (
+                  <>
+                    {engineDownloadDetails}
+                    <label className="setting-row">
+                      <strong>Review speed</strong>
+                      <select
+                        aria-label="Review speed"
+                        value={reviewSpeed}
+                        disabled={reviewing}
+                        onChange={(event) => setReviewSpeed(event.target.value as 'quick' | 'deep')}
+                      >
+                        <option value="quick">Quick · time-limited</option>
+                        <option value="deep">Deep · selected depth</option>
+                      </select>
+                    </label>
+                    <div className="setting-row">
+                      <div>
+                        <strong>Engine</strong>
+                        <small>Full strength or a smaller, faster download</small>
+                      </div>
+                      <select
+                        aria-label="Engine build"
+                        disabled={downloadProgress !== null}
+                        value={flavor}
+                        onChange={(e) => {
+                          reviewAbort.current?.abort();
+                          setReviewing(false);
+                          setFlavor(e.target.value as EngineFlavor);
+                        }}
+                      >
+                        <option value="full">Stockfish 19 · Full</option>
+                        <option value="lite">Stockfish 19 · Lite</option>
+                      </select>
+                    </div>
+                    <div className="setting-row">
+                      <div>
+                        <strong>Analysis depth</strong>
+                        <small>Higher depth takes longer on your device</small>
+                      </div>
+                      <input
+                        type="number"
+                        aria-label="Analysis depth"
+                        min="1"
+                        max="50"
+                        value={depth}
+                        onChange={(e) => {
+                          const n = Number(e.target.value);
+                          if (Number.isInteger(n) && n >= 1 && n <= 50) setDepth(n);
+                        }}
+                      />
+                    </div>
+                    <div className="depth-presets">
+                      {[12, 16, 20].map((d) => (
+                        <button
+                          className={depth === d ? 'selected' : ''}
+                          key={d}
+                          onClick={() => setDepth(d)}
+                        >
+                          {d === 12 ? 'Quick' : d === 16 ? 'Balanced' : 'Deep'}
+                          <small>Depth {d}</small>
+                        </button>
+                      ))}
+                    </div>
+                    {[
+                      ['Continuous analysis', infinite, () => setInfinite((v) => !v)],
+                      ['Show best-move arrow', showArrow, () => setShowArrow((v) => !v)],
+                      ['Show move badges', showBadge, () => setShowBadge((v) => !v)],
+                      ['Show review coach', showCoach, () => setShowCoach((v) => !v)],
+                    ].map(([label, value, fn]) => (
+                      <label className="setting-row" key={String(label)}>
+                        <strong>{String(label)}</strong>
+                        <input
+                          type="checkbox"
+                          checked={Boolean(value)}
+                          onChange={fn as () => void}
+                        />
+                      </label>
+                    ))}
+                    <div className="setting-row">
+                      <strong>Review perspective</strong>
+                      <select value={reviewAs} onChange={(e) => setReviewAs(e.target.value as any)}>
+                        <option value="both">Both players</option>
+                        <option value="w">White</option>
+                        <option value="b">Black</option>
+                      </select>
+                    </div>
+                    <div className="offline-card">
+                      <WifiOff size={22} />
+                      <div>
+                        <strong>
+                          {offlineReady ? 'Engine ready offline' : 'Take your analysis offline'}
+                        </strong>
+                        <p>
+                          {(downloadSize / 1024 / 1024).toFixed(1)} MB ·{' '}
+                          {flavor === 'full' ? 'Full NNUE' : 'Lightweight'} engine. The installed
+                          app also caches the board and opening data.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      className="primary wide"
+                      disabled={
+                        downloadProgress !== null ||
+                        ['checking', 'downloading', 'starting'].includes(engineLoad.phase)
+                      }
+                      onClick={downloadOffline}
+                    >
+                      {downloadProgress !== null ? (
+                        <>
+                          <LoaderCircle size={17} className="spin" />
+                          Downloading {downloadProgress.toFixed(0)}%
+                        </>
+                      ) : offlineReady ? (
+                        <>
+                          <Check size={17} />
+                          Verify offline download
+                        </>
+                      ) : (
+                        <>
+                          <Download size={17} />
+                          Make available offline
+                        </>
+                      )}
+                    </button>
+                    <div className="modal-actions">
+                      <button
+                        className="text-button"
+                        onClick={() => {
+                          void navigator.clipboard
+                            .writeText(displayFen)
+                            .then(() => setToast('FEN copied.'))
+                            .catch(() => saveFile('position.fen', displayFen));
+                        }}
+                      >
+                        <Copy size={15} />
+                        Copy FEN
+                      </button>
+                      <button
+                        className="text-button"
+                        onClick={() =>
+                          saveFile(
+                            'chess-room-backup.json',
+                            exportBackup([study]),
+                            'application/json',
+                          )
+                        }
+                      >
+                        <Download size={15} />
+                        Backup study
+                      </button>
+                      <button
+                        className="text-button"
+                        onClick={() => {
+                          void saveStudy(study)
+                            .then(() => setSaved(`${study.id}:${study.revision}`))
+                            .catch((e) => setError(errorMessage(e)));
+                        }}
+                      >
+                        Retry save
+                      </button>
+                    </div>
+                  </>
+                )}
+                {settingsTab === 'report' && (
+                  <ReviewReport
+                    study={study}
+                    assessments={assessments}
+                    onSelect={(id) => {
+                      setModal(null);
+                      navigate(id);
+                    }}
+                  />
+                )}
+                {settingsTab === 'coach' &&
+                  (coachDetails || (
                     <p>
-                      {(downloadSize / 1024 / 1024).toFixed(1)} MB ·{' '}
-                      {flavor === 'full' ? 'Full NNUE' : 'Lightweight'} engine. The installed app
-                      also caches the board and opening data.
+                      Select an analyzed move to see its explanation. Run Game Review to analyze
+                      every move.
                     </p>
-                  </div>
-                </div>
-                <button
-                  className="primary wide"
-                  disabled={
-                    downloadProgress !== null ||
-                    ['checking', 'downloading', 'starting'].includes(engineLoad.phase)
-                  }
-                  onClick={downloadOffline}
-                >
-                  {downloadProgress !== null ? (
-                    <>
-                      <LoaderCircle size={17} className="spin" />
-                      Downloading {downloadProgress.toFixed(0)}%
-                    </>
-                  ) : offlineReady ? (
-                    <>
-                      <Check size={17} />
-                      Verify offline download
-                    </>
-                  ) : (
-                    <>
-                      <Download size={17} />
-                      Make available offline
-                    </>
-                  )}
-                </button>
-                <div className="modal-actions">
-                  <button
-                    className="text-button"
-                    onClick={() => {
-                      void navigator.clipboard
-                        .writeText(displayFen)
-                        .then(() => setToast('FEN copied.'))
-                        .catch(() => saveFile('position.fen', displayFen));
-                    }}
-                  >
-                    <Copy size={15} />
-                    Copy FEN
-                  </button>
-                  <button
-                    className="text-button"
-                    onClick={() =>
-                      saveFile('chess-room-backup.json', exportBackup([study]), 'application/json')
-                    }
-                  >
-                    <Download size={15} />
-                    Backup study
-                  </button>
-                  <button
-                    className="text-button"
-                    onClick={() => {
-                      void saveStudy(study)
-                        .then(() => setSaved(`${study.id}:${study.revision}`))
-                        .catch((e) => setError(errorMessage(e)));
-                    }}
-                  >
-                    Retry save
-                  </button>
-                </div>
+                  ))}
+                {settingsTab === 'tools' && (
+                  <>
+                    <h3>{study.headers.Event || 'Personal study'}</h3>
+                    <p>
+                      {study.headers.White || 'White'} · {study.headers.Black || 'Black'} ·{' '}
+                      {study.headers.Result || '*'}
+                    </p>
+                    <p>
+                      Right-click / drag: red · Ctrl: orange · Shift: green. Press X to flip; Left /
+                      Right navigate moves.
+                    </p>{' '}
+                    <div className="settings-tools-actions">
+                      <button onClick={() => saveFile('chess-room.pgn', exportPgn(study))}>
+                        <Download size={14} />
+                        Export PGN
+                      </button>
+                      <button onClick={() => setModal('scoring')}>
+                        <Info size={14} />
+                        How we score
+                      </button>
+                    </div>
+                    <button
+                      className="secondary"
+                      onClick={() => {
+                        void listStudies().then(setLibrary);
+                        setModal('library');
+                      }}
+                    >
+                      Saved games & backups
+                    </button>
+                    <p className="fine-print">
+                      Local Stockfish analysis. Unlimited reviews, stored on this device.
+                    </p>
+                  </>
+                )}
               </>
             )}
             {modal === 'scoring' && (

@@ -16,7 +16,7 @@ test('bundled assets and PWA URLs stay within the deployment path', async ({ pag
   await expect(page.getByRole('grid', { name: 'Chessboard' })).toBeVisible();
   // CI exercises the full build; the live smoke check can use the small build.
   if (process.env.ENGINE_TEST_FLAVOR === 'lite') {
-    await page.getByRole('button', { name: 'Engine settings', exact: true }).click();
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await page.getByRole('combobox', { name: 'Engine build' }).selectOption('lite');
     await page.getByRole('button', { name: 'Close dialog' }).click();
   }

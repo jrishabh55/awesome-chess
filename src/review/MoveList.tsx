@@ -1,7 +1,8 @@
 import { MoveQualityIcon } from '../ui/MoveQualityIcon';
-import { useEffect, useRef } from 'react';
-import type { Study, GameNode } from '../chess/types';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import type { Study } from '../chess/types';
 import { labelInfo, type MoveAssessment } from './policy';
+import { moveRows } from './move-rows';
 const figurines: Record<string, string[]> = {
   K: ['♚', '♔'],
   Q: ['♛', '♕'],
@@ -20,27 +21,38 @@ export function MoveList({
   onSelect: (id: string) => void;
   hidden?: boolean;
 }) {
-  const active = useRef<HTMLButtonElement>(null);
   const list = useRef<HTMLDivElement>(null);
-  useEffect(() => {
+  const start = useRef<HTMLButtonElement>(null);
+  const pagination = useRef<HTMLDivElement>(null);
+  const [rowsPerPage, setRowsPerPage] = useState(1);
+  const [page, setPage] = useState(0);
+  const rows = useMemo(() => moveRows(study), [study.nodes, study.rootId]);
+  const selectedRow = rows.findIndex(
+    (row) => row.white === study.selectedId || row.black === study.selectedId,
+  );
+  const pageCount = Math.max(1, Math.ceil(rows.length / rowsPerPage));
+  const currentPage = Math.min(page, pageCount - 1);
+  useLayoutEffect(() => {
     const container = list.current;
     if (!container) return;
-    if (study.selectedId === study.rootId) {
-      container.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
-    }
-    const selected = active.current;
-    if (!selected) return;
-    const bounds = container.getBoundingClientRect();
-    const move = selected.getBoundingClientRect();
-    const delta =
-      move.top < bounds.top
-        ? move.top - bounds.top - 4
-        : move.bottom > bounds.bottom
-          ? move.bottom - bounds.bottom + 4
-          : 0;
-    if (delta) container.scrollBy({ top: delta, behavior: 'smooth' });
-  }, [study.selectedId, study.rootId]);
+    const measure = () => {
+      const style = getComputedStyle(container);
+      const padding = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+      const gap = parseFloat(style.rowGap) || 0;
+      const chrome =
+        (start.current?.getBoundingClientRect().height || 28) +
+        (pagination.current?.getBoundingClientRect().height || 32) +
+        gap * 2;
+      setRowsPerPage(Math.max(1, Math.floor((container.clientHeight - padding - chrome) / 32)));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [hidden]);
+  useLayoutEffect(() => {
+    setPage(Math.floor(Math.max(0, selectedRow) / rowsPerPage));
+  }, [study.id, study.selectedId, selectedRow, rowsPerPage, hidden]);
   if (hidden)
     return (
       <div className="move-list hidden-answer">Moves are hidden while you find a better move.</div>
@@ -50,7 +62,6 @@ export function MoveList({
       a = assessments[id];
     return (
       <button
-        ref={id === study.selectedId ? active : undefined}
         key={id}
         className={`move-cell ${id === study.selectedId ? 'active' : ''}`}
         onClick={() => onSelect(id)}
@@ -81,76 +92,60 @@ export function MoveList({
       </button>
     );
   };
-  const renderLine = (first: string, level = 0): React.ReactNode => {
-    const rows: React.ReactNode[] = [];
-    let id: string | undefined = first;
-    while (id) {
-      const n: GameNode = study.nodes[id],
-        parent: GameNode = study.nodes[n.parentId!],
-        f = parent.fen.split(' ');
-      const next: string | undefined = n.children[0];
-      const white = f[1] === 'w';
-      if (white && next && study.nodes[next].parentId === id) {
-        rows.push(
-          <div className="move-row" key={id}>
-            <span className="move-number">{f[5]}.</span>
-            {moveButton(id)}
-            {moveButton(next)}
-          </div>,
-        );
-        for (const alt of n.children.slice(1))
-          rows.push(
-            <div className="variation" key={alt}>
-              <span className="variation-label">Variation</span>
-              {renderLine(alt, level + 1)}
-            </div>,
-          );
-        if (parent.children[0] === id)
-          for (const alt of parent.children.slice(1))
-            rows.push(
-              <div className="variation" key={alt}>
-                <span className="variation-label">Variation</span>
-                {renderLine(alt, level + 1)}
-              </div>,
-            );
-        id = study.nodes[next].children[0];
-      } else {
-        rows.push(
-          <div className="move-row" key={id}>
-            <span className="move-number">
-              {f[5]}
-              {white ? '.' : '…'}
-            </span>
-            {!white && <span />}
-            {moveButton(id)}
-          </div>,
-        );
-        if (parent.children[0] === id)
-          for (const alt of parent.children.slice(1))
-            rows.push(
-              <div className="variation" key={alt}>
-                <span className="variation-label">Variation</span>
-                {renderLine(alt, level + 1)}
-              </div>,
-            );
-        id = next;
-      }
-    }
-    return rows;
-  };
   return (
     <div className="move-list" ref={list}>
       <button
+        ref={start}
         className={`starting-position ${study.selectedId === study.rootId ? 'active' : ''}`}
         onClick={() => onSelect(study.rootId)}
       >
         Starting position
       </button>
-      {study.nodes[study.rootId].children[0] ? (
-        renderLine(study.nodes[study.rootId].children[0])
-      ) : (
-        <p className="muted padded">Play a move to start exploring.</p>
-      )}
+      <div className="move-page-rows">
+        {rows.length ? (
+          rows.slice(currentPage * rowsPerPage, (currentPage + 1) * rowsPerPage).map((row) => (
+            <div
+              className={`move-row${row.depth ? ' variation-row' : ''}`}
+              key={row.id}
+              style={{ paddingLeft: Math.min(row.depth, 3) * 5 }}
+              title={row.depth ? `Variation, level ${row.depth}` : undefined}
+            >
+              <span className="move-number">
+                {row.depth > 0 && (
+                  <span className="variation-label" aria-label="Variation">
+                    ↳
+                  </span>
+                )}
+                {row.number}
+                {row.white ? '.' : '…'}
+              </span>
+              {row.white ? moveButton(row.white) : <span />}
+              {row.black ? moveButton(row.black) : <span />}
+            </div>
+          ))
+        ) : (
+          <p className="muted padded">Play a move to start exploring.</p>
+        )}
+      </div>
+      <div className="move-pagination" ref={pagination}>
+        <button
+          aria-label="Previous moves page"
+          disabled={currentPage === 0}
+          onClick={() => setPage(currentPage - 1)}
+        >
+          ‹
+        </button>
+        <span aria-live="polite">
+          Page {currentPage + 1} of {pageCount}
+        </span>
+        <button
+          aria-label="Next moves page"
+          disabled={currentPage === pageCount - 1}
+          onClick={() => setPage(currentPage + 1)}
+        >
+          ›
+        </button>
+      </div>
     </div>
   );
 }

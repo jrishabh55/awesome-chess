@@ -1,0 +1,824 @@
+/* The review surface fits the viewport; long reports and preferences live in Settings. */
+.compact-review {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+.compact-review > main {
+  height: 100%;
+  min-height: 0;
+  margin-left: 68px;
+  width: calc(100% - 68px);
+  max-width: none;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.compact-review .sidebar {
+  width: 68px;
+  padding: 12px 6px;
+}
+.compact-review .brand-mark img {
+  width: 40px;
+  height: 40px;
+}
+.compact-review .nav-items {
+  margin-top: 18px;
+  gap: 6px;
+}
+.compact-review .sidebar-bottom,
+.compact-review .breadcrumb,
+.compact-review .beta-tag,
+.compact-review .game-context,
+.compact-review .page-footer {
+  display: none;
+}
+.compact-review .page-header {
+  flex: 0 0 42px;
+  margin: 0;
+  gap: 10px;
+}
+.compact-review h1 {
+  font-size: 21px;
+  white-space: nowrap;
+}
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.header-actions select {
+  max-width: 155px;
+  padding: 7px 9px;
+  color: #deded4;
+  background: #30332c;
+  border: 1px solid #4a5040;
+  border-radius: 7px;
+  font-size: 12px;
+}
+.compact-review .import-button {
+  min-height: 34px;
+  padding: 7px 11px;
+  font-size: 12px;
+}
+.compact-review .workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(310px, 1fr);
+  align-items: stretch;
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+}
+.compact-review .board-column {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+.compact-review .board-with-eval {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  container-type: size;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.compact-review .board-frame {
+  width: min(calc(100cqw - 24px), 100cqh);
+  flex: none;
+}
+.compact-review .evaluation-bar {
+  height: min(calc(100cqw - 24px), 100cqh);
+  width: 16px;
+}
+.compact-review .player-row {
+  flex: 0 0 38px;
+  min-height: 0;
+  padding: 3px 0 3px 22px;
+  gap: 8px;
+}
+.compact-review .player-avatar {
+  width: 30px;
+  height: 30px;
+}
+.compact-review .player-avatar img {
+  width: 25px;
+  height: 25px;
+}
+.compact-review .player-info {
+  gap: 2px;
+  min-width: 0;
+}
+.compact-review .player-info strong {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.compact-review .player-info span {
+  font-size: 9px;
+}
+.compact-review .player-result {
+  padding: 5px 8px;
+  font-size: 11px;
+}
+.compact-review .board-controls {
+  flex: none;
+  min-height: 38px;
+  margin: 4px 0 0 22px;
+  padding: 2px 5px;
+}
+.compact-review .board-caption {
+  flex: 0 0 16px;
+  margin: 2px 0 0;
+  justify-content: flex-end;
+  font-size: 9px;
+}
+.compact-review .board-caption > span:first-child {
+  display: none;
+}
+.compact-review .exploration-banner {
+  flex: none;
+  margin: 4px 0 0 22px;
+  padding: 5px 8px;
+  min-height: 34px;
+  gap: 6px;
+}
+.compact-review .exploration-banner span {
+  font-size: 10px;
+}
+.compact-review .exploration-banner strong {
+  font-size: 11px;
+}
+.compact-review .exploration-banner button {
+  font-size: 10px;
+  padding: 4px;
+}
+.compact-review .analysis-column {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+}
+.review-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 42px;
+  padding: 6px 12px;
+  background: #302f2a;
+  border-bottom: 1px solid #45433b;
+  flex: none;
+}
+.review-topline > span {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.review-topline strong {
+  font-size: 15px;
+  white-space: nowrap;
+}
+.review-topline small {
+  color: #aaa99f;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.settings-top-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  padding: 5px;
+  border-radius: 5px;
+}
+.compact-review .panel-tabs {
+  flex: none;
+}
+.compact-review .panel-tabs button {
+  min-height: 37px;
+  padding: 8px 5px;
+  font-size: 13px;
+}
+.compact-review .engine-status {
+  flex: none;
+  min-height: 34px;
+  padding: 6px 12px;
+  font-size: 11px;
+}
+.compact-review .engine-status > .icon-button {
+  display: none;
+}
+.compact-review .moves-heading {
+  flex: none;
+  min-height: 36px;
+  padding: 6px 12px;
+}
+.compact-review .current-opening {
+  font-size: 12px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.compact-review .current-opening svg {
+  width: 15px;
+}
+.compact-review .moves-heading > span:last-child {
+  font-size: 10px;
+}
+.compact-review .move-list {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  height: auto;
+  min-height: 90px;
+  padding: 0;
+  overflow: hidden;
+}
+.compact-review .starting-position {
+  flex: none;
+  min-height: 28px;
+  margin: 0;
+  padding: 4px 12px;
+  font-size: 11px;
+  line-height: 20px;
+  text-align: left;
+}
+.move-page-rows {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.compact-review .move-row {
+  height: 32px;
+  min-height: 32px;
+  grid-template-columns: 38px 1fr 1fr;
+  padding: 0 8px;
+}
+.compact-review .move-cell {
+  height: 32px;
+  min-height: 32px;
+  font-size: 14px;
+  padding: 4px 7px;
+}
+.compact-review .move-piece {
+  font-size: 19px;
+}
+.compact-review .move-row.variation-row {
+  background: #23241e;
+}
+.compact-review .move-number .variation-label {
+  display: inline;
+  font-size: 10px;
+  margin: 0 3px 0 0;
+  padding: 0;
+  color: #a6b68e;
+}
+.move-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: none;
+  height: 30px;
+  border-top: 1px solid #3b3c34;
+  padding: 2px 8px;
+  color: #aead9e;
+  font-size: 10px;
+}
+.move-pagination button {
+  min-width: 28px;
+  height: 25px;
+  display: grid;
+  place-items: center;
+  border-radius: 4px;
+}
+.move-pagination button:hover {
+  background: #414838;
+}
+.compact-review .panel-body {
+  flex: none;
+  max-height: none;
+  overflow: visible;
+}
+.compact-review .review-content {
+  padding: 8px 12px;
+}
+.compact-review .review-highlights {
+  gap: 12px;
+  margin: 2px 0 6px;
+  font-size: 11px;
+}
+.compact-review .review-highlights .move-quality-icon {
+  width: 17px;
+  height: 17px;
+}
+.compact-review .review-action {
+  margin: 0;
+}
+.compact-review .review-action > .primary {
+  min-height: 40px;
+  font-size: 19px;
+  padding: 6px 10px;
+}
+.compact-review .review-action > .primary svg {
+  width: 22px;
+}
+.compact-review .local-note {
+  margin-top: 5px;
+  font-size: 9px;
+}
+.compact-review .guided-review {
+  display: inline-flex;
+  width: auto;
+  min-height: 26px;
+  margin: 6px 8px 0 0;
+  padding: 4px 7px;
+  font-size: 10px;
+}
+.compact-review .report-link {
+  font-size: 10px;
+  padding: 4px 0;
+}
+.compact-review .analysis-content {
+  padding: 10px 12px;
+}
+.compact-review .engine-line {
+  min-height: 29px;
+  padding: 5px 0;
+}
+.compact-review .line-moves {
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.compact-review .move-feedback {
+  margin-top: 8px;
+  padding: 7px;
+}
+.compact-review .feedback-title strong {
+  font-size: 12px;
+}
+.compact-review .move-feedback p {
+  font-size: 11px;
+  line-height: 1.4;
+  margin-top: 4px;
+}
+.compact-review .analysis-tip {
+  display: none;
+}
+.compact-review .opening-panel {
+  padding: 10px 12px;
+}
+.compact-review .opening-icon,
+.compact-review .opening-panel > .eyebrow {
+  display: none;
+}
+.compact-review .opening-panel h2 {
+  font-size: 16px;
+  margin: 0 0 4px;
+}
+.compact-review .opening-panel p {
+  font-size: 11px;
+  line-height: 1.4;
+  margin: 5px 0;
+}
+.compact-review .opening-panel .secondary {
+  min-height: 28px;
+  padding: 5px 8px;
+  margin-top: 5px;
+  font-size: 11px;
+}
+.compact-review .opening-tags {
+  margin: 4px 0;
+}
+.compact-review .transport {
+  flex: none;
+  height: 47px;
+  gap: 6px;
+  padding: 6px 12px;
+}
+.compact-review .transport button {
+  height: 33px;
+}
+.compact-review .transport button svg {
+  width: 20px;
+}
+.compact-review .engine-loader {
+  flex: none;
+  padding: 8px 12px;
+}
+.compact-review .engine-loader-title {
+  font-size: 11px;
+}
+.compact-review .engine-loader p {
+  margin: 3px 0;
+  font-size: 10px;
+  line-height: 1.4;
+}
+.compact-review .engine-loader .secondary {
+  padding: 5px 9px;
+}
+.compact-review .engine-loader .text-button {
+  padding: 3px 0;
+  font-size: 10px;
+}
+.compact-review .retry-card {
+  margin: 0;
+  padding: 10px 12px;
+  border: none;
+}
+.compact-review .retry-card h3 {
+  font-size: 15px;
+  margin: 6px 0;
+}
+.compact-review .retry-card p {
+  font-size: 11px;
+  line-height: 1.4;
+}
+.compact-review .coach-actions {
+  margin-top: 6px;
+  gap: 6px;
+}
+.compact-review .coach-actions button {
+  padding: 5px 8px;
+  font-size: 11px;
+}
+.compact-review .error-banner,
+.compact-review .update-banner {
+  flex: none;
+  margin: 0;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+.settings-tabs {
+  display: flex;
+  gap: 4px;
+  position: sticky;
+  top: -24px;
+  z-index: 1;
+  background: #2a2e25;
+  padding: 8px 0;
+  margin-bottom: 12px;
+}
+.settings-tabs button {
+  flex: 1;
+  font-size: 12px;
+  padding: 8px 4px;
+  border-radius: 5px;
+}
+.settings-tabs button.active {
+  background: #465738;
+  color: #d7e9c3;
+}
+.settings-tools-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 15px 0;
+}
+.settings-tools-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  background: #3a4131;
+  border-radius: 6px;
+}
+.review-report .classification-table {
+  margin-top: 16px;
+}
+.mode-workspace {
+  height: 100dvh;
+  min-height: 0;
+}
+@media (max-width: 900px) {
+  .compact-review .sidebar {
+    display: none;
+  }
+  .compact-review > main {
+    margin-left: 0;
+    width: 100%;
+    padding: 8px;
+    gap: 6px;
+  }
+  .compact-review .page-header {
+    flex-basis: 36px;
+  }
+  .compact-review h1 {
+    font-size: 17px;
+  }
+  .compact-review .workspace {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 45fr) minmax(0, 55fr);
+    gap: 6px;
+  }
+  .compact-review .board-column,
+  .compact-review .analysis-column {
+    max-width: none;
+    width: 100%;
+    margin: 0;
+  }
+  .compact-review .player-row {
+    flex-basis: 27px;
+    padding-top: 1px;
+    padding-bottom: 1px;
+  }
+  .compact-review .player-avatar {
+    width: 24px;
+    height: 24px;
+  }
+  .compact-review .player-avatar img {
+    width: 21px;
+    height: 21px;
+  }
+  .compact-review .player-info span {
+    display: none;
+  }
+  .compact-review .player-result {
+    padding: 3px 6px;
+  }
+  .compact-review .board-controls {
+    min-height: 32px;
+    margin-top: 2px;
+  }
+  .compact-review .board-controls button {
+    min-height: 27px;
+    height: 27px;
+  }
+  .compact-review .board-caption {
+    flex-basis: 12px;
+    font-size: 8px;
+  }
+  .compact-review .review-topline {
+    min-height: 30px;
+    padding: 3px 9px;
+  }
+  .compact-review .review-topline strong {
+    font-size: 13px;
+  }
+  .compact-review .settings-top-button {
+    font-size: 11px;
+    padding: 3px;
+  }
+  .compact-review .panel-tabs button {
+    min-height: 28px;
+    padding: 4px;
+    font-size: 12px;
+  }
+  .compact-review .engine-status {
+    min-height: 27px;
+    padding: 4px 9px;
+  }
+  .compact-review .moves-heading {
+    min-height: 28px;
+    padding: 4px 9px;
+  }
+  .compact-review .review-content {
+    padding: 5px 9px;
+  }
+  .compact-review .review-highlights,
+  .compact-review .local-note {
+    display: none;
+  }
+  .compact-review .review-action > .primary {
+    min-height: 33px;
+    font-size: 16px;
+  }
+  .compact-review .guided-review {
+    margin-top: 4px;
+    padding: 3px 6px;
+    min-height: 22px;
+  }
+  .compact-review .transport {
+    height: 37px;
+    padding: 3px 9px;
+  }
+  .compact-review .transport button {
+    height: 29px;
+  }
+  .compact-review .analysis-content {
+    padding: 5px 9px;
+  }
+  .compact-review .move-feedback {
+    margin-top: 4px;
+    padding: 4px;
+  }
+  .compact-review .feedback-title small,
+  .compact-review .move-feedback p {
+    display: none;
+  }
+  .compact-review .engine-line {
+    min-height: 25px;
+    padding: 3px 0;
+  }
+  .compact-review .engine-lines {
+    margin-top: 4px;
+  }
+  .compact-review .line-score {
+    padding: 2px 4px;
+  }
+  .compact-review .opening-panel {
+    padding: 6px 9px;
+  }
+  .compact-review .opening-panel > p,
+  .compact-review .opening-variation {
+    display: none;
+  }
+  .compact-review .opening-panel h2 {
+    font-size: 13px;
+  }
+  .compact-review .opening-tags {
+    display: none;
+  }
+  .compact-review .engine-loader {
+    padding: 5px 9px;
+  }
+  .compact-review .engine-loader p {
+    display: none;
+  }
+  .compact-review .engine-loader-title svg {
+    width: 14px;
+  }
+  .compact-review .engine-loader-title {
+    font-size: 10px;
+  }
+  .compact-review .engine-loader small {
+    font-size: 9px;
+  }
+  .compact-review .engine-loader .text-button {
+    font-size: 9px;
+  }
+  .compact-review .exploration-banner {
+    min-height: 25px;
+    margin-top: 2px;
+    padding: 3px 6px;
+  }
+  .compact-review .exploration-banner span {
+    display: none;
+  }
+}
+@media (max-width: 560px) {
+  .compact-review .page-header h1 {
+    display: none;
+  }
+  .compact-review .header-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .header-actions select {
+    max-width: 180px;
+  }
+  .compact-review .import-button {
+    padding: 6px 9px;
+  }
+  .compact-review .review-topline small {
+    max-width: 130px;
+  }
+  .compact-review .settings-top-button span {
+    display: none;
+  }
+  .compact-review .move-cell {
+    font-size: 13px;
+  }
+  .compact-review .move-piece {
+    font-size: 17px;
+  }
+  .compact-review .review-topline > span {
+    gap: 7px;
+  }
+  .compact-review .moves-heading > span:last-child {
+    display: none;
+  }
+}
+@media (max-height: 650px) and (min-width: 901px) {
+  .compact-review .review-highlights,
+  .compact-review .local-note {
+    display: none;
+  }
+  .compact-review .player-row {
+    flex-basis: 30px;
+  }
+  .compact-review .review-topline {
+    min-height: 32px;
+  }
+  .compact-review .review-action > .primary {
+    min-height: 34px;
+  }
+}
+.compact-review .engine-status {
+  position: relative;
+}
+.engine-download-details,
+.engine-retry {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: #d2e8b6;
+  padding: 2px 4px;
+}
+.engine-inline-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  margin: 0;
+  accent-color: #9cca6d;
+}
+.compact-review .modal {
+  max-height: calc(100dvh - 28px);
+  overflow-y: auto;
+}
+.compact-review .modal .engine-loader p {
+  display: block;
+}
+.compact-review .modal .coach-card {
+  margin: 0;
+}
+.compact-review .modal .settings-tools-actions + .secondary {
+  margin-bottom: 12px;
+}
+
+@media (max-width: 900px) {
+  .compact-review .move-list {
+    min-height: 74px;
+  }
+  .compact-review .starting-position {
+    height: 20px;
+    min-height: 20px;
+    padding: 0 9px;
+    line-height: 20px;
+  }
+  .compact-review .move-pagination {
+    height: 22px;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+  .compact-review .move-pagination button {
+    height: 20px;
+  }
+  .compact-review .move-feedback {
+    display: none;
+  }
+}
+@media (max-height: 520px) and (min-width: 600px) {
+  .compact-review .workspace {
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+  }
+  .compact-review .review-topline {
+    min-height: 28px;
+  }
+  .compact-review .panel-tabs button {
+    min-height: 26px;
+  }
+  .compact-review .engine-status {
+    min-height: 25px;
+  }
+  .compact-review .moves-heading {
+    min-height: 24px;
+  }
+  .compact-review .move-feedback {
+    display: none;
+  }
+}
+.compact-review .annotation-tools > button.color-dot {
+  width: 14px;
+  height: 14px;
+  min-height: 14px;
+  min-width: 14px;
+  padding: 0;
+  flex: none;
+  border-radius: 50%;
+}
+.compact-review .analysis-column:has(.retry-card) > .move-list {
+  flex: none;
+  min-height: 27px;
+  height: 27px;
+  padding: 5px 9px;
+  font-size: 10px;
+}
+@media (max-width: 900px) {
+  .compact-review .opening-panel .secondary {
+    min-height: 26px;
+    padding: 4px 8px;
+    margin-top: 4px;
+  }
+  .compact-review .retry-card p {
+    display: none;
+  }
+  .compact-review .retry-card {
+    padding: 6px 9px;
+  }
+}

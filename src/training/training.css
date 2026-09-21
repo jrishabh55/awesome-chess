@@ -1,0 +1,393 @@
+.opening-teacher {
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: #ecede6;
+}
+.ot-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 56px;
+  padding: 6px 18px;
+  border-bottom: 1px solid var(--line);
+  min-width: 0;
+}
+.ot-heading {
+  flex: 1;
+  min-width: 0;
+}
+.ot-heading h1 {
+  font-size: 17px;
+  line-height: 1.25;
+}
+.ot-heading span {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ot-accent {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.ot-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+}
+.ot-icon:hover {
+  background: #3a3e33;
+}
+.ot-course-progress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 20px;
+  font-size: 10px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.ot-course-progress progress {
+  flex: 1;
+  min-width: 20px;
+  height: 5px;
+  accent-color: var(--accent);
+  border: 0;
+  border-radius: 4px;
+}
+.ot-course-progress progress::-webkit-progress-bar {
+  background: #363c30;
+  border-radius: 4px;
+}
+.ot-course-progress progress::-webkit-progress-value {
+  background: var(--accent);
+  border-radius: 4px;
+}
+.ot-workspace {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(270px, 340px);
+  gap: 12px;
+  padding: 0 18px 16px;
+}
+.ot-board-area {
+  min-width: 0;
+  min-height: 0;
+  container-type: size;
+  display: grid;
+  place-items: center;
+}
+.ot-board-wrap {
+  width: min(100cqw, 100cqh);
+}
+.ot-panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  min-height: 0;
+  min-width: 0;
+  padding: clamp(12px, 2vw, 24px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;
+}
+.ot-panel h2 {
+  font-size: clamp(18px, 2vw, 25px);
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ot-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.ot-eyebrow > span {
+  margin-left: auto;
+  color: var(--muted);
+  white-space: nowrap;
+  font-size: 9px;
+}
+.ot-detail {
+  color: var(--muted);
+  font-size: 11px;
+}
+.ot-description,
+.ot-welcome-detail {
+  font-size: 13px;
+  line-height: 1.6;
+}
+.ot-welcome-detail {
+  color: var(--muted);
+}
+.ot-teaching-copy {
+  min-height: 0;
+}
+.ot-teaching-copy h3 {
+  font-size: 16px;
+  line-height: 1.3;
+  margin-bottom: 10px;
+}
+.ot-teaching-copy p {
+  font-size: 13px;
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.ot-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin-top: auto;
+  flex-shrink: 0;
+}
+.ot-primary,
+.ot-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 8px 11px;
+  border-radius: 7px;
+  font-size: 12px;
+  line-height: 1.3;
+  font-weight: 600;
+}
+.ot-primary {
+  background: var(--accent);
+  color: #23321b;
+}
+.ot-primary:hover {
+  background: #c6e5a0;
+  color: #23321b;
+}
+.ot-button {
+  background: #353a30;
+  border: 1px solid #444b3c;
+}
+.ot-button:hover {
+  background: #444b3c;
+}
+.ot-navigation {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ot-navigation > .ot-primary {
+  flex: 1;
+}
+.ot-status {
+  font-size: 9px;
+  color: var(--muted);
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+.ot-feedback {
+  color: #ffb6a9;
+}
+.ot-text {
+  color: var(--accent);
+  font-size: 11px;
+  padding: 5px 0;
+}
+.ot-summary {
+  display: flex;
+  gap: 12px;
+  color: var(--accent);
+  font-size: 12px;
+}
+.ot-dialog {
+  color: #ecede6;
+  background: #292c26;
+  border: 1px solid #4d5644;
+  border-radius: 14px;
+  width: min(570px, calc(100vw - 24px));
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+}
+.ot-dialog::backdrop {
+  background: #10130fe0;
+}
+.ot-dialog-header {
+  position: sticky;
+  top: 0;
+  background: #292c26;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+  z-index: 1;
+}
+.ot-dialog-header h2 {
+  font-size: 19px;
+}
+.ot-dialog-content {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 20px;
+}
+.ot-dialog-content p {
+  font-size: 13px;
+}
+.ot-dialog-content h3 {
+  font-size: 18px;
+}
+.ot-muted {
+  color: var(--muted);
+}
+.ot-catalog-card {
+  padding: 17px;
+  background: #31372b;
+  border: 1px solid #4b5c3c;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ot-catalog-card ul {
+  font-size: 12px;
+  line-height: 1.8;
+  padding-left: 18px;
+  margin: 0;
+  color: #c9d1bf;
+}
+.ot-import {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+}
+.ot-import label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+}
+.ot-import input,
+.ot-import textarea,
+.ot-import select {
+  width: 100%;
+  background: #20251c;
+  color: #ecede6;
+  border: 1px solid #4a523f;
+  border-radius: 7px;
+  padding: 10px;
+  font-size: 13px;
+}
+.ot-import textarea {
+  resize: vertical;
+}
+@media (max-width: 740px) {
+  .ot-header {
+    flex-basis: 48px;
+    gap: 7px;
+    padding: 5px 10px;
+  }
+  .ot-heading h1 {
+    font-size: 15px;
+  }
+  .ot-heading span {
+    font-size: 10px;
+  }
+  .ot-header > .ot-accent {
+    display: none;
+  }
+  .ot-course-progress {
+    padding: 6px 12px;
+    gap: 8px;
+    font-size: 9px;
+  }
+  .ot-workspace {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) 228px;
+    padding: 0 10px 8px;
+    gap: 8px;
+  }
+  .ot-panel {
+    padding: 12px;
+    gap: 7px;
+  }
+  .ot-panel h2 {
+    font-size: 18px;
+  }
+  .ot-description {
+    font-size: 12px;
+    line-height: 1.4;
+  }
+  .ot-welcome-detail {
+    display: none;
+  }
+  .ot-teaching-copy h3 {
+    font-size: 14px;
+    margin-bottom: 5px;
+  }
+  .ot-teaching-copy p {
+    font-size: 12px;
+    line-height: 1.4;
+    -webkit-line-clamp: 3;
+  }
+  .ot-actions {
+    gap: 6px;
+  }
+  .ot-primary,
+  .ot-button {
+    min-height: 33px;
+    padding: 7px 10px;
+    font-size: 11px;
+  }
+  .ot-status {
+    font-size: 8px;
+  }
+}
+@media (max-height: 550px) and (min-width: 600px) {
+  .ot-workspace {
+    grid-template-columns: minmax(0, 1fr) minmax(270px, 340px);
+    grid-template-rows: minmax(0, 1fr);
+  }
+  .ot-panel {
+    padding: 10px;
+    gap: 6px;
+  }
+  .ot-panel h2 {
+    font-size: 17px;
+  }
+  .ot-teaching-copy h3 {
+    font-size: 13px;
+    margin-bottom: 4px;
+  }
+  .ot-teaching-copy p {
+    font-size: 11px;
+    line-height: 1.4;
+    -webkit-line-clamp: 3;
+  }
+  .ot-welcome-detail {
+    display: none;
+  }
+}
