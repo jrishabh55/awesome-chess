@@ -46,6 +46,7 @@ import {
   pathTo,
 } from '../chess/tree';
 import { Board } from '../board/Board';
+import { outcomeAt } from '../chess/outcome';
 import { useStableEngineMove } from '../board/use-stable-engine-move';
 import { samplePgn } from './sample';
 import { prepareWorker, type EngineLoadState } from '../engine/prepare-worker';
@@ -363,14 +364,29 @@ export default function App() {
   }, [autoplay, demo]);
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      const flip = e.key.toLowerCase() === 'x';
+      if (!flip && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
       if (
         (e.target instanceof HTMLElement &&
           (e.target.closest('input,textarea') || e.target.isContentEditable)) ||
         modal ||
-        retry
+        e.isComposing
       )
         return;
+      if (flip) {
+        if (
+          e.ctrlKey ||
+          e.metaKey ||
+          e.altKey ||
+          e.repeat ||
+          (e.target instanceof HTMLElement && e.target.closest('select'))
+        )
+          return;
+        e.preventDefault();
+        setOrientation((color) => (color === 'w' ? 'b' : 'w'));
+        return;
+      }
+      if (retry) return;
       e.preventDefault();
       setAutoplay(false);
       step(e.key === 'ArrowLeft' ? -1 : 1);
@@ -591,6 +607,10 @@ export default function App() {
   );
   const displayResult = result?.positionKey === currentPositionKey ? result : null;
   const hideHints = Boolean(retry && !retry.revealed);
+  const outcome = useMemo(
+    () => (demo || retry ? undefined : outcomeAt(study)),
+    [study, demo, retry],
+  );
   const isSideline =
     !demo &&
     !retry &&
@@ -871,6 +891,7 @@ export default function App() {
                 badge={showBadge && !demo && !retry ? selectedAssessment?.primary : undefined}
                 hideHints={hideHints}
                 isSideline={isSideline}
+                outcome={outcome}
               />
             </div>
             {player(bottom)}
@@ -919,8 +940,9 @@ export default function App() {
               </div>
               <div className="board-utility">
                 <button
-                  title="Flip board"
+                  title="Flip board (X)"
                   aria-label="Flip board"
+                  aria-keyshortcuts="X"
                   onClick={() => setOrientation((c) => (c === 'w' ? 'b' : 'w'))}
                 >
                   <ArrowDownUp size={18} />

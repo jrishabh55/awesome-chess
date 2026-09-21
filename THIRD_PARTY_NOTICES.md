@@ -8,6 +8,6 @@
 - **React and React DOM** — MIT. https://github.com/facebook/react
 - **idb** — ISC. https://github.com/jakearchibald/idb
 - **Lucide icons** — ISC. https://github.com/lucide-icons/lucide
-- **Move-quality badges** — SVGs supplied in `brilliance_v2.zip`. The archive README identifies them as Chess.com analysis icons extracted from its website. The original README is preserved at `public/licenses/brilliance-v2.txt`; the archive supplies no separate license grant. These third-party assets are not relicensed under the application's GPL.
+- **Move-quality and game-result badges** — SVGs supplied in `brilliance_v2.zip`. The archive README identifies them as Chess.com analysis icons extracted from its website. The original README is preserved at `public/licenses/brilliance-v2.txt`; the archive supplies no separate license grant. These third-party assets are not relicensed under the application's GPL.
 
 Exact package versions and integrity hashes are pinned in `package-lock.json`. Dependency packages include their own license texts. The app uses original branding and does not ship Chess.com logos or claim affiliation.

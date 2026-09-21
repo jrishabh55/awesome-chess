@@ -4,6 +4,8 @@ import { Chess } from 'chess.js';
 import type { Color, Square, Mark, DrawingColor } from '../chess/types';
 import { pointToSquare, squareToPoint } from './coordinates';
 import { MoveQualityIcon } from '../ui/MoveQualityIcon';
+import { GameOutcomeBadge } from '../ui/GameOutcomeBadge';
+import type { GameOutcome } from '../chess/outcome';
 import { arrowPath, type Point } from './geometry';
 import { reconcilePieces } from './pieces';
 import { labelInfo, type Label } from '../review/policy';
@@ -37,6 +39,7 @@ interface Props {
   badge?: Label;
   hideHints?: boolean;
   isSideline?: boolean;
+  outcome?: GameOutcome;
 }
 export function Board({
   fen,
@@ -53,6 +56,7 @@ export function Board({
   badge,
   hideHints,
   isSideline = false,
+  outcome,
 }: Props) {
   const boardRef = useRef<HTMLDivElement>(null);
   const gesture = useRef<{
@@ -230,16 +234,22 @@ export function Board({
               {legal.some((m) => m.to === square) && (
                 <span className={piece ? 'legal capture' : 'legal'} />
               )}
-              {!hideHints && badge && lastMove?.slice(2, 4) === square && (
-                <span
-                  className="board-badge"
-                  role="img"
-                  aria-label={`${badge} move`}
-                  title={badge}
-                  style={{ color: labelInfo[badge].color }}
-                >
-                  <MoveQualityIcon label={badge} size={24} />
-                </span>
+              {!hideHints && outcome && piece?.type === 'k' ? (
+                <GameOutcomeBadge outcome={outcome} color={piece.color} />
+              ) : (
+                !hideHints &&
+                badge &&
+                lastMove?.slice(2, 4) === square && (
+                  <span
+                    className="board-badge"
+                    role="img"
+                    aria-label={`${badge} move`}
+                    title={badge}
+                    style={{ color: labelInfo[badge].color }}
+                  >
+                    <MoveQualityIcon label={badge} size={24} />
+                  </span>
+                )
               )}
             </button>
           );
