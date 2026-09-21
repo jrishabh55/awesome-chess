@@ -5,3 +5,4 @@ test-results/
 playwright-report/
 public/engine/
 public/data/
+*.tsbuildinfo

@@ -1,0 +1,31 @@
+import {useEffect,useRef,useState} from 'react';
+import {Chess} from 'chess.js';
+import type {Color,Square,Mark,DrawingColor} from '../chess/types';
+import {pointToSquare,squareToPoint} from './coordinates';
+import {labelInfo,type Label} from '../review/policy';
+const hues={green:'#71b448',red:'#e56464',blue:'#57a1de',yellow:'#ebbd42'};
+const pieceNames:Record<string,string>={p:'pawn',n:'knight',b:'bishop',r:'rook',q:'queen',k:'king'};
+interface Props{fen:string;orientation:Color;lastMove?:string|null;marks:Mark[];engineMarks?:Mark[];coachMarks?:Mark[];onMove:(uci:string)=>void;onToggleMark:(mark:Mark)=>void;drawingMode:'move'|'arrow'|'square';drawingColor:DrawingColor;disabled?:boolean;badge?:Label;hideHints?:boolean}
+export function Board({fen,orientation,lastMove,marks,engineMarks=[],coachMarks=[],onMove,onToggleMark,drawingMode,drawingColor,disabled,badge,hideHints}:Props){
+ const boardRef=useRef<HTMLDivElement>(null);const gesture=useRef<{from:Square;draw:boolean;x:number;y:number}|null>(null);const [selected,setSelected]=useState<Square|null>(null);const [preview,setPreview]=useState<Square|null>(null);const [promotion,setPromotion]=useState<{from:Square;to:Square}|null>(null);const chess=new Chess(fen);
+ useEffect(()=>{setSelected(null);setPreview(null);setPromotion(null);gesture.current=null;},[fen,orientation,drawingMode]);
+ const squareAt=(x:number,y:number)=>{const b=boardRef.current?.getBoundingClientRect();return b?pointToSquare((x-b.left)/b.width*8,(y-b.top)/b.height*8,orientation):null;};
+ const legal=selected?chess.moves({square:selected,verbose:true}):[];
+ const move=(from:Square,to:Square)=>{if(disabled)return;const candidates=chess.moves({square:from,verbose:true}).filter(m=>m.to===to);if(candidates.length){if(candidates.some(m=>m.promotion))setPromotion({from,to});else onMove(from+to);setSelected(null);}else setSelected(chess.get(to)?.color===chess.turn()?to:null);};
+ const activate=(square:Square,draw=false)=>{if(draw||drawingMode!=='move'){if(drawingMode==='square')onToggleMark({kind:'square',square,color:drawingColor});else if(selected){onToggleMark(selected===square?{kind:'square',square,color:drawingColor}:{kind:'arrow',from:selected,to:square,color:drawingColor});setSelected(null);}else setSelected(square);return;}if(selected&&selected!==square)move(selected,square);else setSelected(chess.get(square)?.color===chess.turn()?square:null);};
+ const allMarks=[...(hideHints?[]:marks),...(!hideHints?engineMarks:[]),...coachMarks];
+ if(gesture.current?.draw&&preview&&preview!==gesture.current.from)allMarks.push({kind:'arrow',from:gesture.current.from,to:preview,color:drawingColor});
+ return <div className="board-frame"><div ref={boardRef} role="grid" aria-label="Chessboard" className="chessboard" onContextMenu={e=>e.preventDefault()}
+ onPointerDown={e=>{if(e.button!==0&&e.button!==2)return;const from=squareAt(e.clientX,e.clientY);if(!from)return;gesture.current={from,draw:e.button===2||drawingMode!=='move',x:e.clientX,y:e.clientY};e.currentTarget.setPointerCapture(e.pointerId);}}
+ onPointerMove={e=>{if(gesture.current)setPreview(squareAt(e.clientX,e.clientY));}}
+ onPointerCancel={()=>{gesture.current=null;setPreview(null);setSelected(null);}}
+ onPointerUp={e=>{const g=gesture.current;if(!g)return;const to=squareAt(e.clientX,e.clientY);gesture.current=null;setPreview(null);if(!to)return;const dragged=Math.hypot(e.clientX-g.x,e.clientY-g.y)>6;if(g.draw){if(dragged&&g.from!==to){onToggleMark({kind:'arrow',from:g.from,to,color:drawingColor});setSelected(null);}else if(e.button===2||drawingMode==='square'){onToggleMark({kind:'square',square:to,color:drawingColor});}else activate(to,true);}else if(dragged&&g.from!==to)move(g.from,to);else activate(to);}}>
+ {Array.from({length:64},(_,index)=>{const row=Math.floor(index/8),col=index%8,square=pointToSquare(col,row,orientation)!;const piece=chess.get(square);const light=(square.charCodeAt(0)-97+Number(square[1]))%2===0;const isLast=lastMove&&(lastMove.slice(0,2)===square||lastMove.slice(2,4)===square);const check=piece?.type==='k'&&piece.color===chess.turn()&&chess.isCheck();return <button key={square} role="gridcell" aria-label={`${square}${piece?' '+(piece.color==='w'?'white':'black')+' '+pieceNames[piece.type]:' empty'}`} tabIndex={0} className={`square ${light?'light':'dark'} ${isLast?'last':''} ${selected===square?'selected':''} ${check?'in-check':''}`} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();activate(square);}}}>
+ {col===0&&<span className="rank-label">{square[1]}</span>}{row===7&&<span className="file-label">{square[0]}</span>}
+ {piece&&<img src={`/assets/pieces/${piece.color}${piece.type.toUpperCase()}.svg`} alt="" draggable={false}/>}
+ {legal.some(m=>m.to===square)&&<span className={piece?'legal capture':'legal'}/>}
+ {!hideHints&&badge&&lastMove?.slice(2,4)===square&&<span className="board-badge" style={{background:labelInfo[badge].color}}>{labelInfo[badge].symbol}</span>}
+ </button>})}
+ <svg className="board-overlay" viewBox="0 0 8 8" aria-hidden="true"><defs>{Object.entries(hues).map(([key,color])=><marker key={key} id={`arrow-${key}`} viewBox="0 0 10 10" refX="7" refY="5" markerWidth="3" markerHeight="3" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill={color}/></marker>)}</defs>{allMarks.map((mark,i)=>{if(mark.kind==='square'){const p=squareToPoint(mark.square,orientation);return <rect key={i} x={p.x-.5} y={p.y-.5} width="1" height="1" fill={hues[mark.color]} opacity=".45"/>;}const a=squareToPoint(mark.from,orientation),b=squareToPoint(mark.to,orientation);return <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={hues[mark.color]} strokeWidth=".14" opacity=".85" strokeLinecap="round" markerEnd={`url(#arrow-${mark.color})`}/>})}</svg>
+ </div>{promotion&&<div className="promotion-backdrop"><div className="promotion-dialog"><h3>Choose your promotion</h3><div>{['q','r','b','n'].map(p=><button key={p} aria-label={`Promote to ${pieceNames[p]}`} onClick={()=>{onMove(promotion.from+promotion.to+p);setPromotion(null);}}><img src={`/assets/pieces/${chess.turn()}${p.toUpperCase()}.svg`} alt={pieceNames[p]}/></button>)}</div><button className="text-button" onClick={()=>setPromotion(null)}>Cancel</button></div></div>}</div>;
+}

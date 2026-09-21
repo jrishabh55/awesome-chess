@@ -1,0 +1,2 @@
+Opening names: lichess-org/chess-openings, CC0 1.0, revision c67912be581f0793dbaa776be5ccf111e01f88d9.
+https://github.com/lichess-org/chess-openings/tree/c67912be581f0793dbaa776be5ccf111e01f88d9
