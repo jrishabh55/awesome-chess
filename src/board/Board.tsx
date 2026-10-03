@@ -49,6 +49,7 @@ interface Props {
   isSideline?: boolean;
   outcome?: GameOutcome;
   overlay?: ReactNode;
+  animatePieces?: boolean;
 }
 export function Board({
   fen,
@@ -67,6 +68,7 @@ export function Board({
   isSideline = false,
   outcome,
   overlay,
+  animatePieces = true,
 }: Props) {
   const boardRef = useRef<HTMLDivElement>(null);
   const gesture = useRef<{
@@ -282,7 +284,7 @@ export function Board({
                 className={`board-piece ${dragging ? 'dragging' : ''}`}
                 style={
                   {
-                    '--piece-duration': `${piece.durationMs}ms`,
+                    '--piece-duration': `${animatePieces ? piece.durationMs : 0}ms`,
                     transform: `translate(${(point.x - 0.5) * 100}%, ${(point.y - 0.5) * 100}%)`,
                   } as CSSProperties
                 }

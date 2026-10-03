@@ -138,6 +138,18 @@ it('starts Black recall at the root so White’s opening move can animate', () =
   expect(reply.ply).toBe(1);
   expect(playDrillMove(black, reply, lineAt(reply, black), 'c7c5').session.phase).toBe('feedback');
 });
+it('validates manually recalled opponent moves when practicing both sides', () => {
+  const session = startRound(course, plans(createCurriculum(course)), () => 0);
+  const line = lineAt(session);
+  const first = playDrillMove(course, session, line, 'e2e4', true).session;
+  const wrong = playDrillMove(course, first, line, 'c7c6', true);
+  expect(wrong.correct).toBe(false);
+  expect(wrong.session).toMatchObject({ ply: 1, mistakes: 1, phase: 'drill', scores: {} });
+  const last = playDrillMove(course, wrong.session, line, 'c7c5', true);
+  expect(last.correct).toBe(true);
+  expect(last.session).toMatchObject({ ply: 2, phase: 'feedback' });
+  expect(last.session.scores['batch:0:0']).toEqual({ best: 5, attempts: 1 });
+});
 it('shows the learner’s move before the automatic reply and awards points after the final reply', () => {
   const session = startRound(course, plans(createCurriculum(course)), () => 0);
   const result = playDrillMove(course, session, lineAt(session), 'e2e4');

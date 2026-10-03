@@ -194,3 +194,49 @@ test('backtracking and restarting a Black lesson stay at the manually selected p
   await move(page, 'e2e4');
   await expect(page.getByRole('gridcell', { name: 'e4 white pawn', exact: true })).toBeVisible();
 });
+
+test('lesson automatic replies respect the configured delay and pause when browsing back', async ({
+  page,
+}) => {
+  await seededCourse(page, 'w', 'guide', true);
+  await page.getByRole('button', { name: 'Board settings', exact: true }).click();
+  await page
+    .getByRole('checkbox', { name: 'Automatic opponent replies in lessons', exact: true })
+    .check();
+  await page.getByRole('slider', { name: 'Automatic reply delay', exact: true }).fill('2000');
+  await page.getByRole('button', { name: 'Close opening dialog', exact: true }).click();
+  await move(page, 'e2e4');
+  await page.clock.runFor(1500);
+  await expect(page.getByRole('gridcell', { name: 'e7 black pawn', exact: true })).toBeVisible();
+  await page.clock.runFor(600);
+  await expect(page.getByRole('gridcell', { name: 'e5 black pawn', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Previous move', exact: true }).click();
+  await page.clock.runFor(2500);
+  await expect(page.getByRole('gridcell', { name: 'e7 black pawn', exact: true })).toBeVisible();
+});
+
+test('manual drills require both colors and retain mistake scoring through the final reply', async ({
+  page,
+}) => {
+  await seededCourse(page, 'w', 'drill');
+  await page.clock.install();
+  await page.getByRole('button', { name: 'Board settings', exact: true }).click();
+  await page
+    .getByRole('checkbox', { name: 'Automatic opponent replies in drills', exact: true })
+    .uncheck();
+  await page.getByRole('button', { name: 'Close opening dialog', exact: true }).click();
+  await move(page, 'e2e4');
+  await page.clock.runFor(1500);
+  await expect(page.getByRole('gridcell', { name: 'e7 black pawn', exact: true })).toBeVisible();
+  await move(page, 'e7e6');
+  await expect(page.getByText('Incorrect move.', { exact: false })).toBeVisible();
+  await move(page, 'e7e5');
+  await move(page, 'g1f3');
+  await page.clock.runFor(1500);
+  await expect(page.getByRole('button', { name: 'Retry drill', exact: true })).toHaveCount(0);
+  await move(page, 'b8c6');
+  await expect(
+    page.getByRole('button', { name: 'Course score: 5 points', exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Retry drill', exact: true })).toBeVisible();
+});

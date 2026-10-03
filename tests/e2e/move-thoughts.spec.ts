@@ -72,6 +72,117 @@ test('recall drills do not reveal move thoughts', async ({ page }) => {
   await expect(page.locator('.board-overlay rect')).toHaveCount(0);
 });
 
+test('square highlights stay underneath the pieces', async ({ page }) => {
+  await teacher(page);
+  await page.keyboard.press('Tab');
+  const square = page.getByRole('gridcell', { name: 'd5 empty', exact: true });
+  await square.focus();
+  await expect(square).toBeFocused();
+  const layers = await page.locator('.chessboard').evaluate((board) => {
+    const square = board.querySelector('.board-overlay rect')!;
+    return {
+      squares: Number(getComputedStyle(square.closest('svg')!).zIndex),
+      pieces: Number(getComputedStyle(board.querySelector('.piece-layer')!).zIndex),
+      focusedSquare:
+        Number(getComputedStyle(board.querySelector('[aria-label="d5 empty"]')!).zIndex) || 0,
+    };
+  });
+  expect(layers.squares).toBeLessThan(layers.pieces);
+  expect(layers.focusedSquare).toBeLessThan(layers.squares);
+});
+
+test('closing a thought leaves the position alone and the next move shows a new thought', async ({
+  page,
+}) => {
+  await teacher(page);
+  await page
+    .getByRole('button', { name: 'Close move thought', exact: true })
+    .click({ timeout: 1500 });
+  await expect(page.getByRole('status', { name: 'Move thought' })).toHaveCount(0);
+  await expect(page.getByRole('gridcell', { name: 'e2 white pawn', exact: true })).toBeVisible();
+  await page.keyboard.press('x');
+  await expect(page.getByRole('status', { name: 'Move thought' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Next move', exact: true }).click();
+  await expect(page.getByRole('status', { name: 'Move thought' })).toHaveAttribute(
+    'data-square',
+    'e4',
+  );
+});
+
+test('opening preferences persist and control bubbles, highlights, and animation', async ({
+  page,
+}) => {
+  await teacher(page);
+  await page.getByRole('button', { name: 'Board settings', exact: true }).click({ timeout: 1500 });
+  await page.getByRole('slider', { name: 'Bubble opacity', exact: true }).fill('70');
+  await page.getByRole('checkbox', { name: 'Glass effect', exact: true }).uncheck();
+  await page.getByRole('button', { name: 'Close opening dialog', exact: true }).click();
+  const thought = page.getByRole('status', { name: 'Move thought' });
+  await expect(thought).toHaveCSS('backdrop-filter', 'none');
+  const background = await thought.evaluate((bubble) => getComputedStyle(bubble).backgroundImage);
+  expect(background).toContain('0.7');
+  await page.getByRole('button', { name: 'Board settings', exact: true }).click();
+  await page.getByRole('checkbox', { name: 'Show thought bubbles', exact: true }).uncheck();
+  await page.getByRole('checkbox', { name: 'Highlight explained squares', exact: true }).uncheck();
+  await page.getByRole('checkbox', { name: 'Animate pieces', exact: true }).uncheck();
+  await page.getByRole('button', { name: 'Close opening dialog', exact: true }).click();
+  await expect(thought).toHaveCount(0);
+  await expect(page.locator('.board-overlay rect')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Next move', exact: true }).click();
+  await expect(page.locator('.board-piece[data-piece="e4"]')).toHaveCSS(
+    'transition-duration',
+    '0s',
+  );
+  await page.reload();
+  await page
+    .getByRole('navigation', { name: 'Workspace' })
+    .getByRole('button', { name: 'Opening teacher', exact: true })
+    .click();
+  await page.getByRole('button', { name: 'Board settings', exact: true }).click();
+  await expect(
+    page.getByRole('checkbox', { name: 'Show thought bubbles', exact: true }),
+  ).not.toBeChecked();
+  await expect(
+    page.getByRole('checkbox', { name: 'Highlight explained squares', exact: true }),
+  ).not.toBeChecked();
+  await expect(
+    page.getByRole('checkbox', { name: 'Animate pieces', exact: true }),
+  ).not.toBeChecked();
+  await expect(page.getByRole('slider', { name: 'Bubble opacity', exact: true })).toHaveValue('70');
+  await page.getByRole('button', { name: 'Close opening dialog', exact: true }).click();
+  await page
+    .getByRole('navigation', { name: 'Workspace' })
+    .getByRole('button', { name: 'Game review', exact: true })
+    .click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expect(
+    page.getByRole('checkbox', { name: 'Show thought bubbles', exact: true }),
+  ).not.toBeChecked();
+  await expect(page.getByRole('slider', { name: 'Bubble opacity', exact: true })).toHaveValue('70');
+});
+
+test('failed preference writes retain the previous setting and saved lesson', async ({ page }) => {
+  await teacher(page);
+  await page.evaluate(() => {
+    const setItem = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key, value) {
+      if (key === 'chess-room.opening-preferences.v1')
+        throw new DOMException('Storage full', 'QuotaExceededError');
+      setItem.call(this, key, value);
+    };
+  });
+  await page.getByRole('button', { name: 'Board settings', exact: true }).click();
+  await page.getByRole('checkbox', { name: 'Show thought bubbles', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('settings could not be saved');
+  await expect(
+    page.getByRole('checkbox', { name: 'Show thought bubbles', exact: true }),
+  ).toBeChecked();
+  await page.getByRole('button', { name: 'Close opening dialog', exact: true }).click();
+  await expect(page.getByRole('status', { name: 'Move thought' })).toBeVisible();
+  await page.getByRole('button', { name: 'Next move', exact: true }).click();
+  await expect(page.getByRole('gridcell', { name: 'e4 white pawn', exact: true })).toBeVisible();
+});
+
 test('bubble squares use the existing highlight design and follow each explanation', async ({
   page,
 }) => {

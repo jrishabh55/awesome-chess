@@ -117,9 +117,14 @@ export function playDrillMove(
   session: CurriculumSession,
   line: TeachingLine,
   uci: string,
+  bothSides = false,
 ): { correct: boolean; session: CurriculumSession } {
   const expected = line.moves[session.ply];
-  if (session.phase !== 'drill' || !expected || expected.before.split(' ')[1] !== course.side)
+  if (
+    session.phase !== 'drill' ||
+    !expected ||
+    (!bothSides && expected.before.split(' ')[1] !== course.side)
+  )
     return { correct: false, session };
   if (expected.uci !== uci)
     return { correct: false, session: { ...session, mistakes: session.mistakes + 1 } };

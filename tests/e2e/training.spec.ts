@@ -71,6 +71,25 @@ test('short guided lessons wait for manual play from both colors', async ({ page
   await expect(page.getByRole('gridcell', { name: 'g1 white knight', exact: true })).toBeVisible();
 });
 
+test('short lesson settings support manual recall for both colors', async ({ page }) => {
+  await openTeacher(page);
+  await startShortCourse(page);
+  await page.clock.install();
+  await page.getByRole('button', { name: 'Board settings', exact: true }).click();
+  await page
+    .getByRole('checkbox', { name: 'Automatic opponent replies in drills', exact: true })
+    .uncheck();
+  await page.getByRole('button', { name: 'Close opening dialog', exact: true }).click();
+  await page.getByRole('button', { name: 'Go to end', exact: true }).click();
+  await page.getByRole('button', { name: 'Start practice', exact: true }).click();
+  await move(page, 'e2', 'e4');
+  await page.clock.runFor(1500);
+  await expect(page.getByRole('gridcell', { name: 'e7 black pawn', exact: true })).toBeVisible();
+  await move(page, 'e7', 'e5');
+  await expect(page.getByRole('gridcell', { name: 'e5 black pawn', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Hint', exact: true })).toBeEnabled();
+});
+
 test('custom Black repertoire completes every stage with automatic White moves', async ({
   page,
 }) => {

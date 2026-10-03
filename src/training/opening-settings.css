@@ -1,0 +1,55 @@
+.opening-settings {
+  display: grid;
+  gap: 0;
+}
+.opening-settings > h3 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+.opening-settings > p {
+  font-size: 12px;
+  color: var(--muted, #a8b49d);
+  margin: 0 0 8px;
+}
+.opening-setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid #425336;
+  font-size: 13px;
+}
+.opening-setting-row small {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted, #a8b49d);
+  font-size: 11px;
+  line-height: 1.4;
+}
+.opening-setting-row input {
+  accent-color: #adcf85;
+}
+.opening-setting-row input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+.opening-setting-range {
+  flex-wrap: wrap;
+}
+.opening-range-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 190px;
+  max-width: 100%;
+}
+.opening-range-control input {
+  width: 135px;
+  min-width: 0;
+}
+.opening-range-control output {
+  min-width: 38px;
+  font-variant-numeric: tabular-nums;
+}

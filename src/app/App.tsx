@@ -52,6 +52,7 @@ import { MoveList } from '../review/MoveList';
 import { AnalysisPanel } from '../review/AnalysisPanel';
 import { ReviewPanel, ReviewReport } from '../review/ReviewPanel';
 import { CoachCard } from '../coach/CoachCard';
+import { OpeningSettings } from '../training/OpeningSettings';
 import { keyMoments } from '../coach/explain';
 import { startRetry, submitRetry, type RetrySession } from '../retry/session';
 import { loadOpenings, identifyOpening } from '../openings/lookup';
@@ -1440,6 +1441,7 @@ export default function App({
                 </nav>
                 {settingsTab === 'engine' && (
                   <>
+                    <OpeningSettings />
                     {engineDownloadDetails}
                     <label className="setting-row">
                       <strong>Review speed</strong>

@@ -79,10 +79,16 @@ export function playTrainingMove(
   pack: OpeningPack,
   session: TrainingSession,
   uci: string,
+  bothSides = false,
 ): { correct: boolean; session: TrainingSession } {
   const stage = session.stages[session.stage];
   const expected = currentLine(pack, session).moves[session.ply];
-  if (!stage || stage.kind === 'guide' || !expected || expected.before.split(' ')[1] !== pack.side)
+  if (
+    !stage ||
+    stage.kind === 'guide' ||
+    !expected ||
+    (!bothSides && expected.before.split(' ')[1] !== pack.side)
+  )
     return { correct: false, session };
   if (expected.uci !== uci)
     return { correct: false, session: { ...session, mistakes: session.mistakes + 1 } };

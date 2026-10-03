@@ -69,6 +69,18 @@ describe('opening course', () => {
     expect(restoreProgress(serializeProgress(pack, drill))?.session).toEqual(drill);
     expect(playTrainingReply(pack, drill).ply).toBe(1);
   });
+  it('accepts and validates both colors when manual recall is enabled', () => {
+    const pack = builtInPacks[0];
+    const start = createSession(pack);
+    const drill = nextStage(pack, { ...start, ply: pack.lines[0].moves.length });
+    const first = playTrainingMove(pack, drill, 'e2e4', true).session;
+    const wrong = playTrainingMove(pack, first, 'e7e6', true);
+    expect(wrong.correct).toBe(false);
+    expect(wrong.session).toMatchObject({ ply: 1, mistakes: 1 });
+    const reply = playTrainingMove(pack, wrong.session, 'e7e5', true);
+    expect(reply.correct).toBe(true);
+    expect(reply.session).toMatchObject({ ply: 2, mistakes: 1 });
+  });
   it('runs a whole course to completion and permits guide backtracking', () => {
     const pack = builtInPacks[0];
     let session = createSession(pack);

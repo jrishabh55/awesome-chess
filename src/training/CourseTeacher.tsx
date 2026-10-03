@@ -5,6 +5,8 @@ import { BoardTools, type DrawingMode } from '../board/BoardTools';
 import { BoardNavigation } from '../board/BoardNavigation';
 import { useMoveKeyPacing } from '../board/useMoveKeyPacing';
 import { MoveThought } from './MoveThought';
+import { OpeningSettings } from './OpeningSettings';
+import { useOpeningPreferences } from './preferences';
 import type { Color, DrawingColor, Mark, Square } from '../chess/types';
 import { OpeningLibrary } from './OpeningLibrary';
 import { databasePack } from './database';
@@ -47,6 +49,8 @@ export function CourseTeacher({
   onChoosePack: (pack: OpeningPack) => void;
 }) {
   const [session, setSession] = useState(initialSession);
+  const preferences = useOpeningPreferences();
+  const [replyPaused, setReplyPaused] = useState(false);
   const lastSavedSession = useRef(initialSession);
   const [conflict, setConflict] = useState(false);
   const [active, setActive] = useState(initialActive);
@@ -58,7 +62,7 @@ export function CourseTeacher({
   const [notice, setNotice] = useState('');
   const [storageError, setStorageError] = useState('');
   const [dialog, setDialog] = useState<
-    'catalog' | 'explanation' | 'plans' | 'sections' | 'restart' | null
+    'catalog' | 'explanation' | 'plans' | 'sections' | 'restart' | 'settings' | null
   >(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const index = activeVariationIndex(session);
@@ -72,6 +76,9 @@ export function CourseTeacher({
   const guided = session.phase === 'guide';
   const plansVisible = session.phase === 'plans';
   const drilling = session.phase === 'drill';
+  const automaticReplies =
+    guided || plansVisible ? preferences.autoLessonReplies : preferences.autoDrillReplies;
+  const waitingForReply = opponentTurn && automaticReplies && (!guided || !replyPaused);
   const finished = session.phase === 'complete';
   const sectionIndex = course.sections.findIndex((section) =>
     section.variationIndices.includes(index),
@@ -112,20 +119,13 @@ export function CourseTeacher({
     setNotice('');
   }
   function navigate(delta: number) {
+    setReplyPaused(delta <= 0);
     const asGuide = { ...session, phase: 'guide' as const };
     const next = guideStep(asGuide, line.moves.length, delta);
     update(next.ply === line.moves.length ? { ...next, phase: 'plans' } : next);
   }
   function play(uci: string) {
-    if (
-      !active ||
-      dialog ||
-      conflict ||
-      (opponentTurn && !guided) ||
-      (!guided && !drilling) ||
-      !move
-    )
-      return;
+    if (!active || dialog || conflict || waitingForReply || (!guided && !drilling) || !move) return;
     if (guided) {
       if (uci === move.uci) navigate(1);
       else
@@ -134,7 +134,7 @@ export function CourseTeacher({
         );
       return;
     }
-    const result = playDrillMove(course, session, line, uci);
+    const result = playDrillMove(course, session, line, uci, !preferences.autoDrillReplies);
     setSession(result.session);
     setNotice(
       result.correct
@@ -143,6 +143,7 @@ export function CourseTeacher({
     );
   }
   function advance() {
+    setReplyPaused(false);
     let next = continueCurriculum(course, session);
     if (next.phase === 'round-complete') next = continueCurriculum(course, next);
     update(next);
@@ -175,13 +176,24 @@ export function CourseTeacher({
     }
   }, [course, session, active]);
   useEffect(() => {
-    if (!active || dialog || conflict || !opponentTurn || !drilling) return;
+    if (!active || dialog || conflict || !waitingForReply || (!guided && !drilling)) return;
     // Allow the learner's piece to finish travelling before the reply begins.
     const timer = window.setTimeout(() => {
       setSession((current) => playCurriculumReply(course, current, line));
-    }, 500);
+    }, preferences.replyDelayMs);
     return () => window.clearTimeout(timer);
-  }, [active, dialog, conflict, opponentTurn, drilling, course, line, session]);
+  }, [
+    active,
+    dialog,
+    conflict,
+    waitingForReply,
+    guided,
+    drilling,
+    course,
+    line,
+    session,
+    preferences.replyDelayMs,
+  ]);
   useEffect(() => {
     setHint(false);
     setNotice('');
@@ -224,10 +236,12 @@ export function CourseTeacher({
             from: move.uci.slice(0, 2) as Square,
             to: move.uci.slice(2, 4) as Square,
           },
-          ...(guided ? move.marks : []),
+          ...(guided
+            ? move.marks.filter((mark) => mark.kind !== 'square' || preferences.highlightSquares)
+            : []),
         ]
       : [];
-  if (active && (guided || plansVisible))
+  if (active && (guided || plansVisible) && preferences.highlightSquares)
     coachMarks.push(
       ...explainOpeningMove(course.name, line, Math.max(0, session.ply - 1)).thoughtMarks,
     );
@@ -264,12 +278,8 @@ export function CourseTeacher({
             onToggleMark: toggleMark,
             drawingMode,
             drawingColor,
-            disabled:
-              !active ||
-              !!dialog ||
-              conflict ||
-              (opponentTurn && !guided) ||
-              (!guided && !drilling),
+            animatePieces: preferences.animatePieces,
+            disabled: !active || !!dialog || conflict || waitingForReply || (!guided && !drilling),
           }}
           tools={
             <BoardTools
@@ -279,6 +289,7 @@ export function CourseTeacher({
               onColor={setDrawingColor}
               onClear={() => setAnnotations((current) => ({ ...current, [annotationKey]: [] }))}
               onFlip={flip}
+              onSettings={() => setDialog('settings')}
             />
           }
           caption={
@@ -393,7 +404,7 @@ export function CourseTeacher({
                         : 'Recall practice'}
                 </span>
                 <span>
-                  {guided || plansVisible ? 'Play both sides' : `Play ${sideName(course.side)}`}
+                  {automaticReplies ? `Play ${sideName(course.side)}` : 'Play both sides'}
                 </span>
               </div>
               <h2 title={courseVariationLabel(entry, course.name)}>
@@ -450,15 +461,17 @@ export function CourseTeacher({
               ) : (
                 <div className="ot-teaching-copy ct-copy" aria-live="polite">
                   <h3>
-                    {opponentTurn
+                    {waitingForReply
                       ? 'Opponent replies automatically'
-                      : `Your move as ${sideName(course.side)}`}
+                      : `Your move as ${move?.before.split(' ')[1] === 'b' ? 'Black' : 'White'}`}
                   </h3>
                   <p className={notice ? 'ot-feedback' : ''} role={notice ? 'status' : undefined}>
                     {notice ||
                       (hint
                         ? 'Follow the green arrow, then continue from memory.'
-                        : 'Recall this variation from memory. Your opponent replies automatically.')}
+                        : automaticReplies
+                          ? 'Recall this variation from memory. Your opponent replies automatically.'
+                          : 'Recall this variation from memory and play both colors.')}
                   </p>
                   <div className="ct-attempt-status">
                     {session.mistakes} {session.mistakes === 1 ? 'mistake' : 'mistakes'} ·{' '}
@@ -487,6 +500,7 @@ export function CourseTeacher({
                       <button
                         className="ot-primary"
                         onClick={() => {
+                          setReplyPaused(false);
                           update(startRound(course, session));
                         }}
                       >
@@ -515,7 +529,7 @@ export function CourseTeacher({
                 ) : (
                   <button
                     className="ot-button"
-                    disabled={hint || conflict || opponentTurn}
+                    disabled={hint || conflict || waitingForReply}
                     onClick={() => {
                       setHint(true);
                       setSession(recordHint(session));
@@ -564,15 +578,17 @@ export function CourseTeacher({
       >
         <div className="ot-dialog-header">
           <h2>
-            {dialog === 'catalog'
-              ? 'Choose your opening'
-              : dialog === 'plans'
-                ? 'Middlegame plans'
-                : dialog === 'sections'
-                  ? 'Course sections'
-                  : dialog === 'restart'
-                    ? 'Repeat this course?'
-                    : 'Why this move'}
+            {dialog === 'settings'
+              ? 'Opening settings'
+              : dialog === 'catalog'
+                ? 'Choose your opening'
+                : dialog === 'plans'
+                  ? 'Middlegame plans'
+                  : dialog === 'sections'
+                    ? 'Course sections'
+                    : dialog === 'restart'
+                      ? 'Repeat this course?'
+                      : 'Why this move'}
           </h2>
           <button
             className="ot-icon"
@@ -588,6 +604,7 @@ export function CourseTeacher({
           </div>
         ) : (
           <div className="ot-dialog-content">
+            {dialog === 'settings' && <OpeningSettings />}
             {dialog === 'explanation' && (
               <>
                 <h3>{explanation.title}</h3>
@@ -636,6 +653,7 @@ export function CourseTeacher({
                         scores: session.scores,
                         history: session.history,
                       });
+                      setReplyPaused(false);
                       setActive(true);
                       setDialog(null);
                     }}
