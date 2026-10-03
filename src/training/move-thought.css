@@ -16,7 +16,7 @@
   padding: clamp(6px, 3cqw, 10px) clamp(8px, 4cqw, 15px) clamp(8px, 3cqw, 12px);
   border: 2px solid #f6ffe7b3;
   border-radius: 27px;
-  background: linear-gradient(135deg, #fbfff199, #edf6e073);
+  background: linear-gradient(135deg, #fbfff1ed, #edf6e0e0);
   backdrop-filter: blur(9px) saturate(125%);
   -webkit-backdrop-filter: blur(9px) saturate(125%);
   color: #293321;
@@ -34,7 +34,7 @@
   height: 9px;
   border: 2px solid #f6ffe7b3;
   border-radius: 50%;
-  background: #f4fae980;
+  background: #f4fae9e6;
   backdrop-filter: blur(6px) saturate(125%);
   -webkit-backdrop-filter: blur(6px) saturate(125%);
   left: var(--thought-tail);

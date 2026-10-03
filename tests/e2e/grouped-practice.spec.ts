@@ -127,9 +127,11 @@ test('finishes full lessons, drills only each batch, then re-shuffles all sectio
   page,
 }) => {
   await seed(page);
-  // A learner move and its reply stay in this same full-line lesson.
+  // Both manually played sides stay in this same full-line lesson.
   await move(page, 'e2e4');
   await page.clock.runFor(600);
+  expect((await snapshot(page)).session).toMatchObject({ lesson: 0, ply: 1, phase: 'guide' });
+  await move(page, 'e7e5');
   expect((await snapshot(page)).session).toMatchObject({ lesson: 0, ply: 2, phase: 'guide' });
   await expect(page.getByRole('button', { name: 'Next full line', exact: true })).toHaveCount(0);
   for (let lesson = 0; lesson < 5; lesson++) {

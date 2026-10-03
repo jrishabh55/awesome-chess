@@ -55,7 +55,6 @@ export function CourseTeacher({
   const [drawingColor, setDrawingColor] = useState<DrawingColor>('red');
   const [annotations, setAnnotations] = useState<Record<string, Mark[]>>({});
   const [hint, setHint] = useState(false);
-  const [reviewing, setReviewing] = useState(false);
   const [notice, setNotice] = useState('');
   const [storageError, setStorageError] = useState('');
   const [dialog, setDialog] = useState<
@@ -113,13 +112,20 @@ export function CourseTeacher({
     setNotice('');
   }
   function navigate(delta: number) {
-    setReviewing(delta <= 0);
     const asGuide = { ...session, phase: 'guide' as const };
     const next = guideStep(asGuide, line.moves.length, delta);
     update(next.ply === line.moves.length ? { ...next, phase: 'plans' } : next);
   }
   function play(uci: string) {
-    if (!active || dialog || conflict || opponentTurn || (!guided && !drilling) || !move) return;
+    if (
+      !active ||
+      dialog ||
+      conflict ||
+      (opponentTurn && !guided) ||
+      (!guided && !drilling) ||
+      !move
+    )
+      return;
     if (guided) {
       if (uci === move.uci) navigate(1);
       else
@@ -137,7 +143,6 @@ export function CourseTeacher({
     );
   }
   function advance() {
-    setReviewing(false);
     let next = continueCurriculum(course, session);
     if (next.phase === 'round-complete') next = continueCurriculum(course, next);
     update(next);
@@ -170,21 +175,13 @@ export function CourseTeacher({
     }
   }, [course, session, active]);
   useEffect(() => {
-    if (
-      !active ||
-      dialog ||
-      conflict ||
-      !opponentTurn ||
-      (!guided && !drilling) ||
-      (guided && reviewing)
-    )
-      return;
+    if (!active || dialog || conflict || !opponentTurn || !drilling) return;
     // Allow the learner's piece to finish travelling before the reply begins.
     const timer = window.setTimeout(() => {
       setSession((current) => playCurriculumReply(course, current, line));
     }, 500);
     return () => window.clearTimeout(timer);
-  }, [active, dialog, conflict, opponentTurn, guided, drilling, reviewing, course, line, session]);
+  }, [active, dialog, conflict, opponentTurn, drilling, course, line, session]);
   useEffect(() => {
     setHint(false);
     setNotice('');
@@ -267,7 +264,12 @@ export function CourseTeacher({
             onToggleMark: toggleMark,
             drawingMode,
             drawingColor,
-            disabled: !active || !!dialog || conflict || opponentTurn || (!guided && !drilling),
+            disabled:
+              !active ||
+              !!dialog ||
+              conflict ||
+              (opponentTurn && !guided) ||
+              (!guided && !drilling),
           }}
           tools={
             <BoardTools
@@ -390,7 +392,9 @@ export function CourseTeacher({
                           : 'Batch drill'
                         : 'Recall practice'}
                 </span>
-                <span>Play {sideName(course.side)}</span>
+                <span>
+                  {guided || plansVisible ? 'Play both sides' : `Play ${sideName(course.side)}`}
+                </span>
               </div>
               <h2 title={courseVariationLabel(entry, course.name)}>
                 {courseVariationLabel(entry, course.name)}
@@ -483,7 +487,6 @@ export function CourseTeacher({
                       <button
                         className="ot-primary"
                         onClick={() => {
-                          setReviewing(false);
                           update(startRound(course, session));
                         }}
                       >
@@ -633,7 +636,6 @@ export function CourseTeacher({
                         scores: session.scores,
                         history: session.history,
                       });
-                      setReviewing(false);
                       setActive(true);
                       setDialog(null);
                     }}

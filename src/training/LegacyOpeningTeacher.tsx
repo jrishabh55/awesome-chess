@@ -60,7 +60,6 @@ export function LegacyOpeningTeacher({
   const [storageError, setStorageError] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [hint, setHint] = useState(false);
-  const [reviewing, setReviewing] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const line = currentLine(pack, session);
@@ -81,7 +80,6 @@ export function LegacyOpeningTeacher({
   const annotationKey = fen.split(' ').slice(0, 4).join(' ');
   const flip = () => setOrientation((value) => (value === 'w' ? 'b' : 'w'));
   function navigate(delta: number) {
-    setReviewing(delta <= 0);
     setSession((current) => guideStep(pack, current, delta));
   }
   function toggleAnnotation(mark: Mark) {
@@ -136,12 +134,12 @@ export function LegacyOpeningTeacher({
     }
   }, [active, pack, session]);
   useEffect(() => {
-    if (!active || dialog || finished || !opponentTurn || (guided && reviewing)) return;
+    if (!active || dialog || finished || !opponentTurn || guided) return;
     const timer = window.setTimeout(() => {
       setSession((current) => playTrainingReply(pack, current));
     }, 500);
     return () => window.clearTimeout(timer);
-  }, [active, dialog, finished, opponentTurn, guided, reviewing, pack, session]);
+  }, [active, dialog, finished, opponentTurn, guided, pack, session]);
   useEffect(() => {
     const element = dialogRef.current;
     if (dialog && element && !element.open) element.showModal();
@@ -170,7 +168,6 @@ export function LegacyOpeningTeacher({
     setAnnotations({});
     setDrawingMode('move');
     setSession(nextSession);
-    setReviewing(false);
     setActive(true);
     setDialog(null);
     setHint(false);
@@ -178,7 +175,7 @@ export function LegacyOpeningTeacher({
     setFeedback('');
   }
   function play(uci: string) {
-    if (!active || opponentTurn || lineFinished || finished || dialog) return;
+    if (!active || (opponentTurn && !guided) || lineFinished || finished || dialog) return;
     if (guided) {
       if (uci === move.uci) navigate(1);
       else setFeedback('Follow the lesson move shown by the arrow.');
@@ -190,7 +187,6 @@ export function LegacyOpeningTeacher({
       setFeedback('That is not the move in this variation. Try again; the position is unchanged.');
   }
   function advance() {
-    setReviewing(false);
     setSession((current) => nextStage(pack, current));
   }
   const marks: Mark[] =
@@ -248,7 +244,7 @@ export function LegacyOpeningTeacher({
             onToggleMark: toggleAnnotation,
             drawingMode,
             drawingColor,
-            disabled: !active || opponentTurn || lineFinished || finished || !!dialog,
+            disabled: !active || (opponentTurn && !guided) || lineFinished || finished || !!dialog,
           }}
           tools={
             <BoardTools
@@ -357,7 +353,7 @@ export function LegacyOpeningTeacher({
                   : stage.kind === 'final'
                     ? `Final drill · ${finalIndex + 1} of ${finalStages.length}`
                     : 'Recall practice'}
-                <span>Play {colorName(pack.side)}</span>
+                <span>{guided ? 'Play both sides' : `Play ${colorName(pack.side)}`}</span>
               </div>
               <h2 title={line.name}>{line.name}</h2>
               <div className="ot-detail">

@@ -49,12 +49,15 @@ test('thought bubbles follow the played piece, flip with the board, and retain t
   await expect(thought).toContainText(/I.*d5/);
   await page.getByRole('button', { name: 'Next move', exact: true }).click();
   await expect(thought).toHaveAttribute('data-square', 'e4');
+  await page.getByRole('button', { name: 'Next move', exact: true }).click();
   await expect(thought).toHaveAttribute('data-square', 'e5');
   await expect(thought).toContainText(/Black.*e5/);
   const before = await thought.boundingBox();
   await page.keyboard.press('x');
   const after = await thought.boundingBox();
   expect(Math.abs(after!.y - before!.y)).toBeGreaterThan(30);
+  await page.getByRole('button', { name: 'Next move', exact: true }).click();
+  await expect(thought).toHaveAttribute('data-square', 'f3');
   await page.getByRole('button', { name: 'Next move', exact: true }).click();
   await expect(thought).toHaveAttribute('data-square', 'c6');
   await expect(page.getByText('Line complete', { exact: true })).toBeVisible();
@@ -78,6 +81,7 @@ test('bubble squares use the existing highlight design and follow each explanati
   await expect(mark(4, 4, '#8fbb55')).toHaveAttribute('opacity', '.65');
   await expect(mark(3, 3, '#57a1de')).toHaveAttribute('opacity', '.65');
   await page.getByRole('button', { name: 'Next move', exact: true }).click();
+  await page.getByRole('button', { name: 'Next move', exact: true }).click();
   await expect(page.getByRole('status', { name: 'Move thought' })).toHaveAttribute(
     'data-square',
     'e5',
@@ -95,6 +99,7 @@ test('bubble squares use the existing highlight design and follow each explanati
   await page.keyboard.press('x');
   await expect(mark(2, 2, '#8fbb55')).toBeVisible();
   await expect(mark(3, 4, '#f65c54')).toBeVisible();
+  await page.getByRole('button', { name: 'Next move', exact: true }).click();
   await expect(page.getByRole('status', { name: 'Move thought' })).toHaveAttribute(
     'data-square',
     'c6',
@@ -111,6 +116,8 @@ test('mobile thoughts stay inside the board and do not intercept piece input', a
   await page.screenshot({ path: test.info().outputPath('mobile-thought.png') });
   await page.getByRole('gridcell', { name: 'e2 white pawn', exact: true }).click();
   await page.getByRole('gridcell', { name: 'e4 empty', exact: true }).click();
+  await page.getByRole('gridcell', { name: 'e7 black pawn', exact: true }).click();
+  await page.getByRole('gridcell', { name: 'e5 empty', exact: true }).click();
   await expect(thought).toHaveAttribute('data-square', 'e5');
   for (const [width, height] of [
     [390, 844],

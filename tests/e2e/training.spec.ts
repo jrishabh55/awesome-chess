@@ -58,6 +58,19 @@ test('opening teacher guides, validates drills, and resumes locally', async ({ p
   await expect(page.getByText('1 retries', { exact: true })).toBeVisible();
 });
 
+test('short guided lessons wait for manual play from both colors', async ({ page }) => {
+  await openTeacher(page);
+  await startShortCourse(page);
+  await page.clock.install();
+  await move(page, 'e2', 'e4');
+  await page.clock.runFor(1500);
+  await expect(page.getByRole('gridcell', { name: 'e7 black pawn', exact: true })).toBeVisible();
+  await move(page, 'e7', 'e5');
+  await expect(page.getByRole('gridcell', { name: 'e5 black pawn', exact: true })).toBeVisible();
+  await page.clock.runFor(1500);
+  await expect(page.getByRole('gridcell', { name: 'g1 white knight', exact: true })).toBeVisible();
+});
+
 test('custom Black repertoire completes every stage with automatic White moves', async ({
   page,
 }) => {

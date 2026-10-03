@@ -1,6 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
 
-async function seededCourse(page: Page, side: 'w' | 'b', phase: 'guide' | 'drill') {
+async function seededCourse(
+  page: Page,
+  side: 'w' | 'b',
+  phase: 'guide' | 'drill',
+  manualClock = false,
+) {
   await page.addInitScript(
     ({ side, phase }) => {
       const course = {
@@ -40,6 +45,7 @@ async function seededCourse(page: Page, side: 'w' | 'b', phase: 'guide' | 'drill
     .getByRole('navigation', { name: 'Workspace' })
     .getByRole('button', { name: 'Opening teacher', exact: true })
     .click();
+  if (manualClock) await page.clock.install();
   await page.getByRole('button', { name: 'Resume course', exact: true }).click();
   await observeMotion(page);
 }
@@ -86,26 +92,41 @@ async function expectAnimatedPiece(page: Page, square: string) {
   expect(motion).toBeLessThan(0.8);
 }
 
-test('guided lessons wait after your move, then animate the opponent’s reply', async ({ page }) => {
+test('guided lessons wait for manual moves from both sides and animate each piece', async ({
+  page,
+}) => {
   await seededCourse(page, 'w', 'guide');
+  await page.clock.install();
   await move(page, 'e2e4');
-  await expect(page.getByRole('gridcell', { name: 'e4 white pawn', exact: true })).toBeVisible();
-  await expect(page.getByRole('gridcell', { name: 'e7 black pawn', exact: true })).toBeVisible();
   await expectAnimatedPiece(page, 'e4');
-  await expect(page.getByRole('gridcell', { name: 'e5 black pawn', exact: true })).toBeVisible();
+  await page.clock.runFor(1500);
+  await expect(page.getByRole('gridcell', { name: 'e7 black pawn', exact: true })).toBeVisible();
+  await move(page, 'e7e6');
+  await expect(
+    page.getByText('Follow the lesson move shown by the arrow.', { exact: false }),
+  ).toBeVisible();
+  await move(page, 'e7e5');
   await expectAnimatedPiece(page, 'e5');
   await move(page, 'g1f3');
-  await expect(page.getByRole('gridcell', { name: 'c6 black knight', exact: true })).toBeVisible();
+  await page.clock.runFor(1500);
+  await expect(page.getByRole('gridcell', { name: 'b8 black knight', exact: true })).toBeVisible();
+  await move(page, 'b8c6');
+  await expectAnimatedPiece(page, 'c6');
   await expect(page.getByText('Line complete', { exact: true })).toBeVisible();
 });
 
-test('Black lessons animate White’s opening move and later White replies', async ({ page }) => {
-  await seededCourse(page, 'b', 'guide');
-  await expect(page.getByRole('gridcell', { name: 'e4 white pawn', exact: true })).toBeVisible();
+test('Black lessons wait for White’s first move and accept both colors manually', async ({
+  page,
+}) => {
+  await seededCourse(page, 'b', 'guide', true);
+  await page.clock.runFor(1500);
+  await expect(page.getByRole('gridcell', { name: 'e2 white pawn', exact: true })).toBeVisible();
+  await move(page, 'e2e4');
   await expectAnimatedPiece(page, 'e4');
   await move(page, 'e7e5');
+  await page.clock.runFor(1500);
   await expect(page.getByRole('gridcell', { name: 'g1 white knight', exact: true })).toBeVisible();
-  await expect(page.getByRole('gridcell', { name: 'f3 white knight', exact: true })).toBeVisible();
+  await move(page, 'g1f3');
   await expectAnimatedPiece(page, 'f3');
 });
 
@@ -126,7 +147,7 @@ test('recall waits for each reply and records completion after the final reply',
 });
 
 test('pending replies pause in a dialog and cancel when leaving the teacher', async ({ page }) => {
-  await seededCourse(page, 'w', 'guide');
+  await seededCourse(page, 'w', 'drill');
   await page.clock.install();
   await move(page, 'e2e4');
   await page.getByRole('button', { name: 'Course sections', exact: true }).click();
@@ -157,19 +178,19 @@ test('pending replies pause in a dialog and cancel when leaving the teacher', as
   await expect(page.getByRole('gridcell', { name: 'c6 black knight', exact: true })).toBeVisible();
 });
 
-test('backtracking stays put and restarting a Black lesson restores automatic opening moves', async ({
+test('backtracking and restarting a Black lesson stay at the manually selected position', async ({
   page,
 }) => {
   await seededCourse(page, 'b', 'guide');
-  await expect(page.getByRole('gridcell', { name: 'e4 white pawn', exact: true })).toBeVisible();
+  await move(page, 'e2e4');
   await page.clock.install();
   await page.getByRole('button', { name: 'Previous move', exact: true }).click();
   await page.clock.runFor(1000);
   await expect(page.getByRole('gridcell', { name: 'e2 white pawn', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Restart course', exact: true }).click();
   await page.getByRole('button', { name: 'Restart lessons', exact: true }).click();
-  await page.clock.runFor(600);
-  await expect(page.getByRole('gridcell', { name: 'e4 white pawn', exact: true })).toBeVisible({
-    timeout: 1000,
-  });
+  await page.clock.runFor(1500);
+  await expect(page.getByRole('gridcell', { name: 'e2 white pawn', exact: true })).toBeVisible();
+  await move(page, 'e2e4');
+  await expect(page.getByRole('gridcell', { name: 'e4 white pawn', exact: true })).toBeVisible();
 });
