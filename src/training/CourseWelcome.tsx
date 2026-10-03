@@ -95,8 +95,8 @@ export function CourseWelcome({
           <div className="ot-eyebrow">A complete learning path</div>
           <h2>Make the opening yours.</h2>
           <p className="ot-description">
-            Choose London, Sicilian, or another opening. Learn its variations in sections that share
-            the same starting moves.
+            Choose London, Sicilian, or another opening. Follow complete lines, then learn the
+            opponent’s alternative responses.
           </p>
           <div className="ct-welcome-steps">
             <p>
@@ -105,7 +105,9 @@ export function CourseWelcome({
             </p>
             <p>
               <Layers3 size={17} />
-              <span>Learn one variation, then drill all you know.</span>
+              <span>
+                Learn up to five related lines, drill the batch, then review each section.
+              </span>
             </p>
             <p>
               <Trophy size={17} />

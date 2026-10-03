@@ -2,6 +2,7 @@ import { Chess, DEFAULT_POSITION } from 'chess.js';
 import { parsePgn } from '../chess/tree';
 import type { Color, Mark } from '../chess/types';
 import { MAX_PROGRESS_CHARS, SESSION_RESERVE_CHARS, OVERSIZED_COURSE_MESSAGE } from './limits';
+import { longestLines } from './unique-lines';
 
 export interface TeachingMove {
   uci: string;
@@ -22,6 +23,15 @@ export interface OpeningPack {
   description: string;
   side: Color;
   lines: TeachingLine[];
+}
+export function longestTeachingLines(lines: TeachingLine[]): TeachingLine[] {
+  return longestLines(
+    lines.map((entry) => ({
+      entry,
+      root: entry.rootFen,
+      moves: entry.moves.map((move) => move.uci),
+    })),
+  ).map(({ entry }) => entry);
 }
 const pieceNames: Record<string, string> = {
   p: 'pawn',
@@ -202,7 +212,6 @@ export function importPack(text: string, side: Color, name: string): OpeningPack
       if (moves.length > 120) throw Error('Keep each opening variation within 120 half-moves.');
       const node = study.nodes[id];
       if (!node.children.length && moves.length) {
-        if (lines.length >= 40) throw Error('Import up to 40 variations at a time.');
         if (!moves.some((m) => new Chess(m.before).turn() === side))
           throw Error(`Every line needs a move for ${side === 'w' ? 'White' : 'Black'}.`);
         lines.push({
@@ -213,6 +222,9 @@ export function importPack(text: string, side: Color, name: string): OpeningPack
           rootFen: study.rootFen,
           moves,
         });
+        const unique = longestTeachingLines(lines);
+        if (unique.length > 40) throw Error('Import up to 40 variations at a time.');
+        lines.splice(0, lines.length, ...unique);
       }
       for (const childId of node.children) {
         const child = study.nodes[childId];

@@ -13,6 +13,7 @@ import {
   guideStep,
   nextStage,
   playTrainingMove,
+  playTrainingReply,
   position,
   PROGRESS_KEY,
   restoreProgress,
@@ -56,6 +57,7 @@ export function LegacyOpeningTeacher({
   const [storageError, setStorageError] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [hint, setHint] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const line = currentLine(pack, session);
@@ -64,6 +66,7 @@ export function LegacyOpeningTeacher({
   const guided = stage?.kind === 'guide';
   const lineFinished = session.ply >= line.moves.length;
   const move = line.moves[session.ply];
+  const opponentTurn = !!move && move.before.split(' ')[1] !== pack.side;
   const lastMove = line.moves[session.ply - 1];
   const learned = session.stages.slice(0, session.stage).filter((s) => s.kind === 'guide').length;
   const finalStages = session.stages.filter((s) => s.kind === 'final');
@@ -73,6 +76,10 @@ export function LegacyOpeningTeacher({
   const fen = position(pack, session);
   const annotationKey = fen.split(' ').slice(0, 4).join(' ');
   const flip = () => setOrientation((value) => (value === 'w' ? 'b' : 'w'));
+  function navigate(delta: number) {
+    setReviewing(delta <= 0);
+    setSession((current) => guideStep(pack, current, delta));
+  }
   function toggleAnnotation(mark: Mark) {
     const key = (value: Mark) =>
       value.kind === 'arrow'
@@ -108,7 +115,7 @@ export function LegacyOpeningTeacher({
       }
       if (!active || !guided || !['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
       event.preventDefault();
-      setSession((current) => guideStep(pack, current, event.key === 'ArrowLeft' ? -1 : 1));
+      navigate(event.key === 'ArrowLeft' ? -1 : 1);
     };
     window.addEventListener('keydown', keydown);
     return () => window.removeEventListener('keydown', keydown);
@@ -123,6 +130,13 @@ export function LegacyOpeningTeacher({
       setStorageError(true);
     }
   }, [active, pack, session]);
+  useEffect(() => {
+    if (!active || dialog || finished || !opponentTurn || (guided && reviewing)) return;
+    const timer = window.setTimeout(() => {
+      setSession((current) => playTrainingReply(pack, current));
+    }, 500);
+    return () => window.clearTimeout(timer);
+  }, [active, dialog, finished, opponentTurn, guided, reviewing, pack, session]);
   useEffect(() => {
     const element = dialogRef.current;
     if (dialog && element && !element.open) element.showModal();
@@ -151,6 +165,7 @@ export function LegacyOpeningTeacher({
     setAnnotations({});
     setDrawingMode('move');
     setSession(nextSession);
+    setReviewing(false);
     setActive(true);
     setDialog(null);
     setHint(false);
@@ -158,13 +173,19 @@ export function LegacyOpeningTeacher({
     setFeedback('');
   }
   function play(uci: string) {
-    if (!active || guided || lineFinished || finished || dialog) return;
+    if (!active || opponentTurn || lineFinished || finished || dialog) return;
+    if (guided) {
+      if (uci === move.uci) navigate(1);
+      else setFeedback('Follow the lesson move shown by the arrow.');
+      return;
+    }
     const result = playTrainingMove(pack, session, uci);
     setSession(result.session);
     if (!result.correct)
       setFeedback('That is not the move in this variation. Try again; the position is unchanged.');
   }
   function advance() {
+    setReviewing(false);
     setSession((current) => nextStage(pack, current));
   }
   const marks: Mark[] =
@@ -209,7 +230,7 @@ export function LegacyOpeningTeacher({
             onToggleMark: toggleAnnotation,
             drawingMode,
             drawingColor,
-            disabled: !active || !!guided || lineFinished || finished || !!dialog,
+            disabled: !active || opponentTurn || lineFinished || finished || !!dialog,
           }}
           tools={
             <BoardTools
@@ -337,7 +358,7 @@ export function LegacyOpeningTeacher({
                   <p>
                     {lineFinished
                       ? 'Now play your side from memory. The opponent’s moves will be played for you.'
-                      : move.note}
+                      : feedback || move.note}
                   </p>
                   {!lineFinished && move.note.length > 180 && (
                     <button className="ot-text" onClick={() => setDialog('note')}>
@@ -350,9 +371,11 @@ export function LegacyOpeningTeacher({
                   <h3>
                     {lineFinished
                       ? 'Variation recalled.'
-                      : revealed
-                        ? `Play ${move.san}`
-                        : `Your move as ${colorName(pack.side)}`}
+                      : opponentTurn
+                        ? 'Opponent replies automatically'
+                        : revealed
+                          ? `Play ${move.san}`
+                          : `Your move as ${colorName(pack.side)}`}
                   </h3>
                   <p className={feedback ? 'ot-feedback' : ''}>
                     {lineFinished
@@ -375,10 +398,10 @@ export function LegacyOpeningTeacher({
                 {guided ? (
                   <>
                     <BoardNavigation
-                      onStart={() => setSession(guideStep(pack, session, -session.ply))}
-                      onPrevious={() => setSession(guideStep(pack, session, -1))}
-                      onNext={() => setSession(guideStep(pack, session, 1))}
-                      onEnd={() => setSession(guideStep(pack, session, line.moves.length))}
+                      onStart={() => navigate(-session.ply)}
+                      onPrevious={() => navigate(-1)}
+                      onNext={() => navigate(1)}
+                      onEnd={() => navigate(line.moves.length)}
                       canPrevious={session.ply > 0}
                       canNext={!lineFinished}
                     />
@@ -398,7 +421,7 @@ export function LegacyOpeningTeacher({
                   <div className="ot-navigation">
                     <button
                       className="ot-button"
-                      disabled={hint || revealed}
+                      disabled={hint || revealed || opponentTurn}
                       onClick={() => {
                         setHint(true);
                         setSession((s) => ({ ...s, hints: s.hints + 1 }));
@@ -408,7 +431,7 @@ export function LegacyOpeningTeacher({
                     </button>
                     <button
                       className="ot-button"
-                      disabled={revealed}
+                      disabled={revealed || opponentTurn}
                       onClick={() => {
                         setRevealed(true);
                         setFeedback('');

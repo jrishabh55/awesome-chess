@@ -1,7 +1,8 @@
 import { databasePack } from './database';
-import type { OpeningCourse } from './courses';
+import { courseLineKey, type OpeningCourse } from './courses';
 import type { TeachingLine } from './packs';
 import { MAX_PROGRESS_CHARS } from './limits';
+import { learningBatch, practiceBatches } from './practice-batches';
 
 export interface CurriculumSession {
   lesson: number;
@@ -12,6 +13,9 @@ export interface CurriculumSession {
   mistakes: number;
   hints: number;
   scores: Record<string, { best: number; attempts: number }>;
+  practice?: 'batches';
+  drill?: 'batch' | 'section';
+  history?: { points: number; recalls: Record<string, { best: number; attempts: number }> };
 }
 export const CURRICULUM_KEY = 'chess-room.opening-curriculum.v1';
 export class CurriculumConflictError extends Error {
@@ -33,6 +37,8 @@ export function createCurriculum(course: OpeningCourse): CurriculumSession {
     mistakes: 0,
     hints: 0,
     scores: {},
+    practice: 'batches',
+    drill: 'batch',
   };
 }
 export function activeVariationIndex(session: CurriculumSession): number {
@@ -45,11 +51,6 @@ const compile = (course: OpeningCourse, index: number) => {
   if (pack.lines.length !== 1) throw Error('A course variation must contain one legal move line.');
   return pack.lines[0];
 };
-function initialPly(course: OpeningCourse, line: TeachingLine, from = 0): number {
-  let ply = from;
-  while (ply < line.moves.length && line.moves[ply].before.split(' ')[1] !== course.side) ply++;
-  return ply;
-}
 export function guideStep(
   session: CurriculumSession,
   lineLength: number,
@@ -64,7 +65,31 @@ export function startRound(
   random = Math.random,
 ): CurriculumSession {
   if (session.phase !== 'plans') return session;
-  const round = Array.from({ length: session.lesson + 1 }, (_, index) => index);
+  const batch = learningBatch(course, session.lesson);
+  const next = { ...session, practice: 'batches' as const, drill: 'batch' as const };
+  if (session.lesson < batch.variationIndices.at(-1)!) return nextLesson(next);
+  return beginRound(next, batch.variationIndices, 'batch', random);
+}
+function nextLesson(session: CurriculumSession): CurriculumSession {
+  return {
+    ...session,
+    phase: 'guide',
+    lesson: session.lesson + 1,
+    ply: 0,
+    round: [],
+    roundIndex: 0,
+    mistakes: 0,
+    hints: 0,
+    drill: 'batch',
+  };
+}
+function beginRound(
+  session: CurriculumSession,
+  indices: number[],
+  drill: 'batch' | 'section',
+  random: () => number,
+): CurriculumSession {
+  const round = [...indices];
   for (let i = round.length - 1; i > 0; i--) {
     const j = Math.floor(random() * (i + 1));
     [round[i], round[j]] = [round[j], round[i]];
@@ -74,10 +99,18 @@ export function startRound(
     phase: 'drill',
     round,
     roundIndex: 0,
-    ply: initialPly(course, compile(course, round[0])),
+    ply: 0,
     mistakes: 0,
     hints: 0,
+    practice: 'batches',
+    drill,
   };
+}
+export function drillScoreKey(
+  session: CurriculumSession,
+  index = activeVariationIndex(session),
+): string {
+  return `${session.practice === 'batches' ? `${session.drill}:` : ''}${session.lesson}:${index}`;
 }
 export function playDrillMove(
   course: OpeningCourse,
@@ -86,43 +119,57 @@ export function playDrillMove(
   uci: string,
 ): { correct: boolean; session: CurriculumSession } {
   const expected = line.moves[session.ply];
-  if (session.phase !== 'drill' || !expected) return { correct: false, session };
+  if (session.phase !== 'drill' || !expected || expected.before.split(' ')[1] !== course.side)
+    return { correct: false, session };
   if (expected.uci !== uci)
     return { correct: false, session: { ...session, mistakes: session.mistakes + 1 } };
-  const ply = initialPly(course, line, session.ply + 1);
-  if (ply < line.moves.length) return { correct: true, session: { ...session, ply } };
-  const key = `${session.lesson}:${activeVariationIndex(session)}`;
+  return { correct: true, session: advanceDrillMove(session, line) };
+}
+function advanceDrillMove(session: CurriculumSession, line: TeachingLine): CurriculumSession {
+  const ply = session.ply + 1;
+  if (ply < line.moves.length) return { ...session, ply };
+  const key = drillScoreKey(session);
   const previous = session.scores[key];
   return {
-    correct: true,
-    session: {
-      ...session,
-      ply,
-      phase: 'feedback',
-      scores: {
-        ...session.scores,
-        [key]: {
-          best: Math.max(previous?.best || 0, session.mistakes ? 5 : 10),
-          attempts: (previous?.attempts || 0) + 1,
-        },
+    ...session,
+    ply,
+    phase: 'feedback',
+    scores: {
+      ...session.scores,
+      [key]: {
+        best: Math.max(previous?.best || 0, session.mistakes ? 5 : 10),
+        attempts: (previous?.attempts || 0) + 1,
       },
     },
   };
+}
+export function playCurriculumReply(
+  course: OpeningCourse,
+  session: CurriculumSession,
+  line: TeachingLine,
+): CurriculumSession {
+  const move = line.moves[session.ply];
+  if (!move || move.before.split(' ')[1] === course.side) return session;
+  if (session.phase === 'drill') return advanceDrillMove(session, line);
+  if (session.phase !== 'guide') return session;
+  const ply = session.ply + 1;
+  return { ...session, ply, phase: ply === line.moves.length ? 'plans' : 'guide' };
 }
 export function recordHint(session: CurriculumSession): CurriculumSession {
   return session.phase === 'drill' ? { ...session, hints: session.hints + 1 } : session;
 }
 export function retryDrill(
-  course: OpeningCourse,
+  _course: OpeningCourse,
   session: CurriculumSession,
-  line: TeachingLine,
+  _line: TeachingLine,
 ): CurriculumSession {
   if (session.phase !== 'feedback') return session;
-  return { ...session, phase: 'drill', ply: initialPly(course, line), mistakes: 0, hints: 0 };
+  return { ...session, phase: 'drill', ply: 0, mistakes: 0, hints: 0 };
 }
 export function continueCurriculum(
   course: OpeningCourse,
   session: CurriculumSession,
+  random = Math.random,
 ): CurriculumSession {
   if (session.phase === 'feedback') {
     const roundIndex = session.roundIndex + 1;
@@ -131,23 +178,21 @@ export function continueCurriculum(
       ...session,
       phase: 'drill',
       roundIndex,
-      ply: initialPly(course, compile(course, session.round[roundIndex])),
+      ply: 0,
       mistakes: 0,
       hints: 0,
     };
   }
   if (session.phase === 'round-complete') {
+    const section = course.sections.find((section) =>
+      section.variationIndices.includes(session.lesson),
+    )!;
+    // Finish an already-running legacy drill before switching schedules; its
+    // existing score keys and round order stay intact.
+    if (session.drill !== 'section' && session.lesson === section.variationIndices.at(-1))
+      return beginRound(session, section.variationIndices, 'section', random);
     if (session.lesson + 1 >= course.variations.length) return { ...session, phase: 'complete' };
-    return {
-      ...session,
-      phase: 'guide',
-      lesson: session.lesson + 1,
-      ply: 0,
-      round: [],
-      roundIndex: 0,
-      mistakes: 0,
-      hints: 0,
-    };
+    return nextLesson({ ...session, practice: 'batches' });
   }
   return session;
 }
@@ -172,9 +217,30 @@ function validate(course: OpeningCourse, session: CurriculumSession) {
     course.variations.length > 5000 ||
     !integer(course.sourceCount) ||
     course.sourceCount < course.variations.length ||
-    course.sourceCount > 5000
+    course.sourceCount > 5000 ||
+    (course.structure !== undefined && course.structure !== 'responses-v1')
   )
     throw damaged();
+  if (!record(session)) throw damaged();
+  if (session.history !== undefined) {
+    const history = session.history;
+    if (
+      !record(history) ||
+      !integer(history.points) ||
+      history.points % 5 !== 0 ||
+      !record(history.recalls)
+    )
+      throw damaged();
+    for (const [key, score] of Object.entries(history.recalls))
+      if (
+        !text(key, 10000) ||
+        !record(score) ||
+        ![5, 10].includes(score.best) ||
+        !integer(score.attempts) ||
+        score.attempts < 1
+      )
+        throw damaged();
+  }
   const ids = new Set<string>();
   for (const entry of course.variations) {
     if (
@@ -222,17 +288,33 @@ function validate(course: OpeningCourse, session: CurriculumSession) {
       session.phase,
     ) ||
     !Array.isArray(session.round) ||
-    !record(session.scores)
+    !record(session.scores) ||
+    (session.practice !== undefined && session.practice !== 'batches') ||
+    (session.practice === 'batches'
+      ? !['batch', 'section'].includes(session.drill || '')
+      : session.drill !== undefined)
   )
     throw damaged();
   const touring = session.phase === 'guide' || session.phase === 'plans';
+  const batch = session.practice === 'batches' ? learningBatch(course, session.lesson) : null;
+  const section = course.sections.find((section) =>
+    section.variationIndices.includes(session.lesson),
+  )!;
+  const expectedRound = batch
+    ? session.drill === 'section'
+      ? section.variationIndices
+      : batch.variationIndices
+    : Array.from({ length: session.lesson + 1 }, (_, index) => index);
   if (
     touring
-      ? session.round.length !== 0 || session.roundIndex !== 0
-      : session.round.length !== session.lesson + 1 ||
+      ? session.round.length !== 0 ||
+        session.roundIndex !== 0 ||
+        (batch && session.drill !== 'batch')
+      : session.round.length !== expectedRound.length ||
         session.roundIndex >= session.round.length ||
         new Set(session.round).size !== session.round.length ||
-        session.round.some((index) => !integer(index) || index > session.lesson)
+        session.round.some((index) => !integer(index) || !expectedRound.includes(index)) ||
+        (batch && session.lesson !== expectedRound.at(-1))
   )
     throw damaged();
   if (
@@ -240,11 +322,14 @@ function validate(course: OpeningCourse, session: CurriculumSession) {
     session.roundIndex !== session.round.length - 1
   )
     throw damaged();
-  if (session.phase === 'complete' && session.lesson !== course.variations.length - 1)
+  if (
+    session.phase === 'complete' &&
+    (session.lesson !== course.variations.length - 1 || (batch && session.drill !== 'section'))
+  )
     throw damaged();
   const completedByRound = Array(course.variations.length).fill(0) as number[];
   for (const [key, score] of Object.entries(session.scores)) {
-    const match = key.match(/^(0|[1-9]\d*):(0|[1-9]\d*)$/);
+    const match = key.match(/^(?:(batch|section):)?(0|[1-9]\d*):(0|[1-9]\d*)$/);
     if (
       !match ||
       !record(score) ||
@@ -253,8 +338,9 @@ function validate(course: OpeningCourse, session: CurriculumSession) {
       score.attempts < 1
     )
       throw damaged();
-    const round = Number(match[1]);
-    const variation = Number(match[2]);
+    const kind = match[1];
+    const round = Number(match[2]);
+    const variation = Number(match[3]);
     if (
       !integer(round) ||
       !integer(variation) ||
@@ -262,26 +348,54 @@ function validate(course: OpeningCourse, session: CurriculumSession) {
       variation > round
     )
       throw damaged();
-    completedByRound[round]++;
+    if (kind) {
+      if (!batch) throw damaged();
+      const indices =
+        kind === 'batch'
+          ? learningBatch(course, round).variationIndices
+          : course.sections.find((section) => section.variationIndices.includes(round))!
+              .variationIndices;
+      if (round !== indices.at(-1) || !indices.includes(variation)) throw damaged();
+    } else completedByRound[round]++;
   }
-  for (let index = 0; index < session.lesson; index++)
-    if (completedByRound[index] !== index + 1) throw damaged();
+  if (batch) {
+    const legacyThrough = completedByRound.reduce(
+      (last, count, index) => (count === index + 1 ? index : last),
+      -1,
+    );
+    for (const previous of practiceBatches(course)) {
+      const end = previous.variationIndices.at(-1)!;
+      if (
+        (end < session.lesson ||
+          (!touring && session.drill === 'section' && end === session.lesson)) &&
+        end > legacyThrough &&
+        !previous.variationIndices.every((index) => session.scores[`batch:${end}:${index}`])
+      )
+        throw damaged();
+    }
+    for (const previous of course.sections) {
+      const end = previous.variationIndices.at(-1)!;
+      if (
+        end < session.lesson &&
+        end > legacyThrough &&
+        !previous.variationIndices.every((index) => session.scores[`section:${end}:${index}`])
+      )
+        throw damaged();
+    }
+  } else {
+    for (let index = 0; index < session.lesson; index++)
+      if (completedByRound[index] !== index + 1) throw damaged();
+  }
   if (!touring) {
     for (const variation of session.round.slice(0, session.roundIndex))
-      if (!session.scores[`${session.lesson}:${variation}`]) throw damaged();
-    if (
-      session.phase !== 'drill' &&
-      !session.scores[`${session.lesson}:${activeVariationIndex(session)}`]
-    )
-      throw damaged();
+      if (!session.scores[drillScoreKey(session, variation)]) throw damaged();
+    if (session.phase !== 'drill' && !session.scores[drillScoreKey(session)]) throw damaged();
   }
   const line = compile(course, activeVariationIndex(session));
   if (
     session.ply > line.moves.length ||
     (session.phase === 'plans' && session.ply !== line.moves.length) ||
-    (session.phase === 'drill' &&
-      (session.ply === line.moves.length ||
-        line.moves[session.ply].before.split(' ')[1] !== course.side)) ||
+    (session.phase === 'drill' && session.ply === line.moves.length) ||
     (['feedback', 'round-complete', 'complete'].includes(session.phase) &&
       session.ply !== line.moves.length)
   )
@@ -357,6 +471,16 @@ function canonicalSession(session: CurriculumSession): string {
     roundIndex: session.roundIndex,
     mistakes: session.mistakes,
     hints: session.hints,
+    practice: session.practice,
+    drill: session.drill,
+    history: session.history && {
+      points: session.history.points,
+      recalls: Object.fromEntries(
+        Object.entries(session.history.recalls)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([key, score]) => [key, { best: score.best, attempts: score.attempts }]),
+      ),
+    },
     scores: Object.fromEntries(
       Object.entries(session.scores)
         .sort(([a], [b]) => a.localeCompare(b))
@@ -368,13 +492,16 @@ function courseIdentity(course: OpeningCourse): string {
   return JSON.stringify({
     id: course.id,
     side: course.side,
+    structure: course.structure,
     variations: course.variations.map((entry) => [entry.id, entry.pgn]),
+    sections: course.sections.map((section) => [section.id, section.variationIndices]),
   });
 }
 export function saveCurriculum(
   course: OpeningCourse,
   session: CurriculumSession,
   expectedPrevious?: CurriculumSession | null,
+  expectedCourse: OpeningCourse = course,
 ): void {
   validate(course, session);
   const previous = readLibrary();
@@ -386,7 +513,7 @@ export function saveCurriculum(
         ? stored !== null
         : !stored ||
           canonicalSession(stored.session) !== canonicalSession(expectedPrevious) ||
-          courseIdentity(stored.course) !== courseIdentity(course)
+          courseIdentity(stored.course) !== courseIdentity(expectedCourse)
     )
       throw new CurriculumConflictError();
   }
@@ -407,4 +534,32 @@ export function saveCurriculum(
       'The course could not be saved. Free browser storage and try again. Your previous saved courses are unchanged.',
     );
   }
+}
+
+/** Rebuild changed syllabuses without attaching indexed awards to different lines. */
+export function upgradeCurriculum(
+  saved: CurriculumSnapshot,
+  course: OpeningCourse,
+): CurriculumSnapshot {
+  if (saved.course.id !== course.id) throw Error('Cannot move progress to another opening.');
+  if (
+    courseIdentity(saved.course) === courseIdentity(course) ||
+    (saved.course.structure === 'responses-v1' && course.structure !== 'responses-v1')
+  )
+    return saved;
+  const history = {
+    points: saved.session.history?.points || 0,
+    recalls: { ...saved.session.history?.recalls },
+  };
+  for (const [key, score] of Object.entries(saved.session.scores)) {
+    const entry = saved.course.variations[Number(key.split(':').at(-1))];
+    const identity = courseLineKey(entry);
+    const previous = history.recalls[identity];
+    history.points += score.best;
+    history.recalls[identity] = {
+      best: Math.max(previous?.best || 0, score.best),
+      attempts: (previous?.attempts || 0) + score.attempts,
+    };
+  }
+  return { course, session: { ...createCurriculum(course), history } };
 }

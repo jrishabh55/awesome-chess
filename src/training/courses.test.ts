@@ -32,7 +32,7 @@ it('unifies actual London System families without absorbing unrelated London def
   expect(searchCourses(courses, 'london').items).toContain(london);
   expect(courses).toHaveLength(3);
 });
-it('keeps a foundation, removes repeated/prefix lines, and retains every divergent leaf', () => {
+it('removes every repeated/prefix line including the foundation and retains divergent leaves', () => {
   const entries = [
     entry('base', 'Sicilian Defense', '1. e4 c5', 'B20'),
     entry('prefix', 'Sicilian Defense: Open', '1. e4 c5 2. Nf3 d6', 'B50'),
@@ -43,29 +43,51 @@ it('keeps a foundation, removes repeated/prefix lines, and retains every diverge
   const course = openingCourses(entries)[0];
   expect(course.side).toBe('b');
   expect(course.sourceCount).toBe(5);
-  expect(course.variations.map((v) => v.id)).toEqual(['base', 'a', 'b']);
+  expect(course.variations.map((v) => v.id)).toEqual(['a', 'b']);
   expect(openingCourses([...entries].reverse())).toEqual([course]);
 });
-it('organizes contiguous shared move-prefix sections and covers every variation once', () => {
+it('keeps only the deepest line across a chain of one-move extensions', () => {
   const entries = [
-    entry('base', 'Sicilian Defense', '1. e4 c5', 'B20'),
-    entry('a', 'Sicilian Defense: Branch A', '1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6', 'B50'),
-    entry('b', 'Sicilian Defense: Branch B', '1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Qxd4 Nc6', 'B50'),
-    entry('c', 'Sicilian Defense: Other A', '1. e4 c5 2. Nc3 Nc6 3. g3 g6', 'B23'),
-    entry('d', 'Sicilian Defense: Other B', '1. e4 c5 2. Nc3 Nc6 3. f4 g6', 'B23'),
-    entry('e', 'Sicilian Defense: Independent', '1. e4 c5 2. b3', 'B20'),
+    entry('root', 'Italian Game', '1. e4 e5 2. Nf3 Nc6 3. Bc4', 'C50'),
+    entry('reply', 'Italian Game: Classical', '1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5', 'C50'),
+    entry('longest', 'Italian Game: Classical', '1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. c3', 'C50'),
   ];
   const course = openingCourses(entries)[0];
-  expect(course.sections[0].name).toBe('Foundation');
-  expect(course.sections.flatMap((section) => section.variationIndices)).toEqual(
-    course.variations.map((_, index) => index),
-  );
-  expect(
-    course.sections
-      .filter((section) => section.variationIndices.length >= 2)
-      .map((section) => section.commonPgn),
-  ).toEqual(expect.arrayContaining(['1. e4 c5 2. Nf3 d6 3. d4 cxd4', '1. e4 c5 2. Nc3 Nc6']));
-  expect(course.sections.find((section) => section.name === 'Other replies')?.commonPgn).toBe('');
+  expect(course.variations.map((line) => line.id)).toEqual(['longest']);
+  expect(course.sourceCount).toBe(3);
+  expect(course.sections.flatMap((section) => section.variationIndices)).toEqual([0]);
+});
+it('finishes full lines and their nearby variations within the same opening branch', () => {
+  const course = openingCourses([
+    entry('root', 'Italian Game', '1. e4 e5 2. Nf3 Nc6 3. Bc4', 'C50'),
+    entry(
+      'main',
+      'Italian Game: Classical Variation, Main line',
+      '1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. c3 Nf6 5. d3 d6',
+      'C50',
+    ),
+    entry(
+      'reply',
+      'Italian Game: Classical Variation, Other reply',
+      '1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. d3 Bc5',
+      'C50',
+    ),
+    entry(
+      'choice',
+      'Italian Game: Classical Variation, Different plan',
+      '1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. d3 Nf6',
+      'C50',
+    ),
+  ])[0];
+  expect(course.variations[0].id).toBe('main');
+  expect(course.sections[0].variationIndices.map((i) => course.variations[i].id)).toEqual([
+    'main',
+    'choice',
+    'reply',
+  ]);
+  expect(course.sections).toHaveLength(1);
+  expect(course.sections.every((s) => !s.name.startsWith('After '))).toBe(true);
+  expect(course.sections.flatMap((s) => s.variationIndices)).toEqual([0, 1, 2]);
 });
 it('labels similarly named rows by ending moves and searches course names, ECO, and branches', () => {
   const a = entry('a', "Queen's Pawn Game: London System", '1. d4 d5 2. Nf3 Nf6 3. Bf4');
@@ -133,56 +155,45 @@ it('normalizes apostrophes and ranks course names ahead of incidental variation 
   expect(searchCourses(courses, 'London').items[0].name).toBe('London System');
   expect(searchCourses(courses, 'London System').items[0].name).toBe('London System');
 });
-it('groups branches sharing White’s fourth move before Black replies diverge', () => {
+it('keeps both players’ alternative responses together in a named line section', () => {
   const course = openingCourses([
-    entry('base-fourth-white', 'Sicilian Defense', '1. e4 c5', 'B20'),
     entry(
-      'fourth-white-a',
-      'Sicilian Defense: Fourth move A',
-      '1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6',
-      'B50',
-    ),
-    entry(
-      'fourth-white-b',
-      'Sicilian Defense: Fourth move B',
-      '1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 a6',
-      'B50',
-    ),
-  ])[0];
-  const section = course.sections[1];
-  expect(section.commonPgn).toBe('1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4');
-  expect(section.name).toBe('After 4.Nxd4');
-  expect(section.variationIndices).toEqual([1, 2]);
-});
-it('groups branches sharing Black’s fourth move before White replies diverge', () => {
-  const entries = [
-    entry('base-fourth-black', 'Sicilian Defense', '1. e4 c5', 'B20'),
-    entry(
-      'fourth-black-a',
-      'Sicilian Defense: Fifth move A',
+      'a',
+      'Sicilian Defense: Open, Main response',
       '1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3',
       'B50',
     ),
     entry(
-      'fourth-black-b',
-      'Sicilian Defense: Fifth move B',
+      'b',
+      'Sicilian Defense: Open, Other response',
       '1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. f3',
       'B50',
     ),
-  ];
-  const course = openingCourses(entries)[0];
-  expect(course.sections[1].commonPgn).toBe('1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6');
-  expect(course.sections[1].name).toBe('After 4…Nf6');
-  expect(openingCourses([...entries].reverse())).toEqual([course]);
-  expect(course.sections.flatMap((section) => section.variationIndices)).toEqual([0, 1, 2]);
-});
-it('retains three-ply shared starts when branches split before the third move', () => {
-  const course = openingCourses([
-    entry('base-short', 'Sicilian Defense', '1. e4 c5', 'B20'),
-    entry('short-a', 'Sicilian Defense: Early A', '1. e4 c5 2. Nf3 d6', 'B50'),
-    entry('short-b', 'Sicilian Defense: Early B', '1. e4 c5 2. Nf3 Nc6', 'B30'),
+    entry(
+      'c',
+      'Sicilian Defense: Open, Alternative choice',
+      '1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 a6',
+      'B50',
+    ),
+    entry('d', 'Sicilian Defense: Closed', '1. e4 c5 2. Nc3 Nc6 3. g3', 'B23'),
   ])[0];
-  expect(course.sections[1].commonPgn).toBe('1. e4 c5 2. Nf3');
-  expect(course.sections[1].name).toBe('After 2.Nf3');
-  expect(course.sections[1].variationIndices).toEqual([1, 2]);
+  expect(course.sections).toHaveLength(2);
+  expect(course.sections[0].name).toBe('Open');
+  expect(course.sections[0].commonPgn).toBe('1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4');
+  expect(course.sections[0].variationIndices).toEqual([0, 1, 2]);
+  expect(course.sections[1].name).toBe('Closed');
+});
+it('starts real Caro-Kann study with a full continuation and finishes named branches together', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { parseOpeningCatalog } = await import('../openings/catalog');
+  const entries = parseOpeningCatalog(readFileSync('public/data/b.tsv', 'utf8'));
+  const course = openingCourses(entries).find((c) => c.name === 'Caro-Kann Defense')!;
+  const first = new Chess();
+  first.loadPgn(course.variations[0].pgn);
+  expect(first.history().length).toBeGreaterThanOrEqual(20);
+  expect(course.sections[0].name).toBe('Classical Variation');
+  expect(course.sections[0].variationIndices.length).toBeGreaterThan(2);
+  for (const index of course.sections[0].variationIndices)
+    expect(course.variations[index].name).toMatch(/^Caro-Kann Defense: Classical Variation/);
+  expect(course.sections.every((section) => !section.name.startsWith('After '))).toBe(true);
 });

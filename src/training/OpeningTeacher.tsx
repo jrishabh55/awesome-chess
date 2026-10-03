@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { LegacyOpeningTeacher } from './LegacyOpeningTeacher';
 import { CourseTeacher } from './CourseTeacher';
 import { CourseWelcome } from './CourseWelcome';
@@ -6,9 +6,11 @@ import {
   createCurriculum,
   loadCurriculum,
   saveCurriculum,
+  upgradeCurriculum,
   type CurriculumSession,
 } from './curriculum';
-import type { OpeningCourse } from './courses';
+import { openingCourses, type OpeningCourse } from './courses';
+import { loadOpeningCatalog } from '../openings/catalog';
 import type { OpeningPack } from './packs';
 import { createSession, PROGRESS_KEY, serializeProgress } from './session';
 
@@ -35,11 +37,43 @@ function initialView(): View {
 export function OpeningTeacher(_props: { onBack?: () => void } = {}) {
   const [view, setView] = useState<View>(initialView);
   const [revision, setRevision] = useState(0);
+  useEffect(() => {
+    if (view.kind !== 'course' || view.course.structure === 'responses-v1') return;
+    let alive = true;
+    loadOpeningCatalog()
+      .then((entries) => {
+        if (!alive) return;
+        const current = openingCourses(entries).find((course) => course.id === view.course.id);
+        if (!current) return;
+        const saved = loadCurriculum(current.id);
+        if (!saved || saved.course.structure === 'responses-v1') return;
+        const upgraded = upgradeCurriculum(saved, current);
+        saveCurriculum(current, upgraded.session, saved.session, saved.course);
+        setView((previous) =>
+          previous.kind === 'course' && previous.course.id === current.id
+            ? { kind: 'course', ...upgraded, active: previous.active }
+            : previous,
+        );
+        setRevision((value) => value + 1);
+      })
+      .catch(() => {
+        /* Keep the saved course usable when its catalog is unavailable. */
+      });
+    return () => {
+      alive = false;
+    };
+  }, [
+    view.kind === 'course' ? view.course.id : '',
+    view.kind === 'course' ? view.course.structure : undefined,
+  ]);
   function chooseCourse(course: OpeningCourse) {
     const saved = loadCurriculum(course.id);
-    if (saved) course = saved.course;
-    const session = saved?.session || createCurriculum(course);
-    saveCurriculum(course, session, saved?.session || null);
+    const selected = saved
+      ? upgradeCurriculum(saved, course)
+      : { course, session: createCurriculum(course) };
+    course = selected.course;
+    const session = selected.session;
+    saveCurriculum(course, session, saved?.session || null, saved?.course || course);
     localStorage.setItem(MODE_KEY, 'course');
     setView({ kind: 'course', course, session, active: true });
     setRevision((value) => value + 1);

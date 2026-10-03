@@ -47,11 +47,11 @@ export function position(pack: OpeningPack, session: TrainingSession): string {
   const line = currentLine(pack, session);
   return session.ply === 0 ? line.rootFen : line.moves[session.ply - 1].after;
 }
-function skipOpponent(pack: OpeningPack, session: TrainingSession): TrainingSession {
-  const line = currentLine(pack, session);
-  let ply = session.ply;
-  while (ply < line.moves.length && new Chess(line.moves[ply].before).turn() !== pack.side) ply++;
-  return { ...session, ply };
+export function playTrainingReply(pack: OpeningPack, session: TrainingSession): TrainingSession {
+  if (!session.stages[session.stage]) return session;
+  const move = currentLine(pack, session).moves[session.ply];
+  if (!move || move.before.split(' ')[1] === pack.side) return session;
+  return { ...session, ply: session.ply + 1 };
 }
 export function guideStep(
   pack: OpeningPack,
@@ -73,7 +73,7 @@ export function nextStage(pack: OpeningPack, session: TrainingSession): Training
   const next = { ...session, stage: session.stage + 1, ply: 0 };
   if (next.stage === next.stages.length)
     return { ...next, ply: currentLine(pack, session).moves.length };
-  return next.stages[next.stage].kind === 'guide' ? next : skipOpponent(pack, next);
+  return next;
 }
 export function playTrainingMove(
   pack: OpeningPack,
@@ -82,10 +82,11 @@ export function playTrainingMove(
 ): { correct: boolean; session: TrainingSession } {
   const stage = session.stages[session.stage];
   const expected = currentLine(pack, session).moves[session.ply];
-  if (!stage || stage.kind === 'guide' || !expected) return { correct: false, session };
+  if (!stage || stage.kind === 'guide' || !expected || expected.before.split(' ')[1] !== pack.side)
+    return { correct: false, session };
   if (expected.uci !== uci)
     return { correct: false, session: { ...session, mistakes: session.mistakes + 1 } };
-  return { correct: true, session: skipOpponent(pack, { ...session, ply: session.ply + 1 }) };
+  return { correct: true, session: { ...session, ply: session.ply + 1 } };
 }
 export function serializeProgress(pack: OpeningPack, session: TrainingSession): string {
   const raw = JSON.stringify({ version: 1, pack, session });
@@ -174,13 +175,6 @@ export function restoreProgress(raw: string | null): Progress | null {
       return null;
     const line = currentLine(pack, session);
     if (session.ply > line.moves.length) return null;
-    if (
-      session.stage < session.stages.length &&
-      session.stages[session.stage].kind !== 'guide' &&
-      session.ply < line.moves.length &&
-      new Chess(line.moves[session.ply].before).turn() !== pack.side
-    )
-      return null;
     return data;
   } catch {
     return null;

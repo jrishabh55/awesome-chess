@@ -4,7 +4,7 @@ import type { CatalogOpening } from '../openings/catalog';
 import { openingCourses, searchCourses, type OpeningCourse } from './courses';
 import { PickerCombobox } from './OpeningCombobox';
 import { builtInPacks, type OpeningPack } from './packs';
-import type { CurriculumSnapshot } from './curriculum';
+import { upgradeCurriculum, type CurriculumSnapshot } from './curriculum';
 import { courseProgress } from './course-progress';
 import { CourseProgressBadge, CourseSyllabus } from './CourseSyllabus';
 import './course.css';
@@ -30,15 +30,17 @@ export function CourseBrowser({
     () =>
       view === 'learned'
         ? savedCourses.map((item) => item.course).sort((a, b) => a.name.localeCompare(b.name))
-        : openingCourses(entries).map((course) => savedById.get(course.id)?.course || course),
+        : openingCourses(entries),
     [entries, savedById, savedCourses, view],
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const selected = courses.find((course) => course.id === selectedId) || null;
   const saved = selected ? savedById.get(selected.id) : undefined;
-  const progressOf = (course: OpeningCourse) =>
-    courseProgress(course, savedById.get(course.id)?.session);
+  const progressOf = (course: OpeningCourse) => {
+    const saved = savedById.get(course.id);
+    return courseProgress(course, saved ? upgradeCurriculum(saved, course).session : undefined);
+  };
   const selectedProgress = selected ? progressOf(selected) : null;
   const featured = [
     'London System',

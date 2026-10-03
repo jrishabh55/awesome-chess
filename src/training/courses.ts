@@ -2,6 +2,7 @@ import { Chess } from 'chess.js';
 import type { Color } from '../chess/types';
 import type { CatalogOpening } from '../openings/catalog';
 import { familyName } from '../openings/families';
+import { longestLines } from './unique-lines';
 
 export interface CourseSection {
   id: string;
@@ -16,6 +17,7 @@ export interface OpeningCourse {
   variations: CatalogOpening[];
   sourceCount: number;
   sections: CourseSection[];
+  structure?: 'responses-v1';
 }
 interface Line {
   entry: CatalogOpening;
@@ -48,6 +50,10 @@ const pgnOf = (sans: string[]) =>
   sans
     .map((san, index) => `${index % 2 === 0 ? `${Math.floor(index / 2) + 1}. ` : ''}${san}`)
     .join(' ');
+export function courseLineKey(entry: CatalogOpening): string {
+  const line = lineOf(entry);
+  return `${line.root}|${line.moves.join(' ')}`;
+}
 const lineOrder = (a: Line, b: Line) =>
   a.moves.length - b.moves.length ||
   compare(a.entry.name, b.entry.name) ||
@@ -58,11 +64,79 @@ const courseName = (entry: CatalogOpening) =>
   /\bLondon System\b/.test(entry.name) ? 'London System' : familyName(entry);
 const sideFor = (name: string): Color =>
   /London System|Attack|Gambit/i.test(name) ? 'w' : /Defen[cs]e/i.test(name) ? 'b' : 'w';
-const foundationRank = (line: Line, name: string) =>
-  line.entry.name === name ||
-  (name === 'London System' && /(?:^|: )London System$/.test(line.entry.name))
-    ? 0
-    : 1;
+// Walk one complete path before taking a sibling response. Long continuations
+// lead each subtree; a named position that prefixes a full line is never a lesson.
+interface MoveTree {
+  children: Map<string, MoveTree>;
+  line?: Line;
+  depth: number;
+}
+function fullLineOrder(lines: Line[]): Line[] {
+  const root: MoveTree = { children: new Map(), depth: 0 };
+  for (const line of lines) {
+    let node = root;
+    for (const move of [line.root, ...line.moves]) {
+      let child = node.children.get(move);
+      if (!child) {
+        child = { children: new Map(), depth: 0 };
+        node.children.set(move, child);
+      }
+      child.depth = Math.max(child.depth, line.moves.length);
+      node = child;
+    }
+    node.line = line;
+  }
+  const result: Line[] = [];
+  function visit(node: MoveTree) {
+    if (node.line) result.push(node.line);
+    for (const [, child] of [...node.children].sort(
+      (a, b) => b[1].depth - a[1].depth || compare(a[0], b[0]),
+    ))
+      visit(child);
+  }
+  visit(root);
+  return result;
+}
+function responseSections(lines: Line[], name: string) {
+  // A section is an opening branch, not an arbitrary depth in its move trie.
+  // Teach each complete continuation before visiting the closest sibling line,
+  // including alternative choices for either player.
+  const groups = new Map<string, Line[]>();
+  for (const line of fullLineOrder(lines)) {
+    const title = line.entry.name.startsWith(`${name}:`)
+      ? line.entry.name
+          .slice(name.length + 1)
+          .trim()
+          .split(',')[0]
+      : name;
+    groups.set(title, [...(groups.get(title) || []), line]);
+  }
+  const variations: CatalogOpening[] = [];
+  const sections: CourseSection[] = [];
+  for (const [title, lines] of groups) {
+    const ordered = fullLineOrder(lines);
+    const first = ordered[0];
+    let depth = first.moves.length;
+    for (const line of ordered) {
+      if (line.root !== first.root) {
+        depth = 0;
+        break;
+      }
+      let shared = 0;
+      while (shared < depth && line.moves[shared] === first.moves[shared]) shared++;
+      depth = shared;
+    }
+    const start = variations.length;
+    variations.push(...ordered.map((line) => line.entry));
+    sections.push({
+      id: `responses:${title}`,
+      name: title,
+      commonPgn: pgnOf(first.sans.slice(0, depth)),
+      variationIndices: ordered.map((_, index) => start + index),
+    });
+  }
+  return { variations, sections };
+}
 
 export function openingCourses(entries: CatalogOpening[]): OpeningCourse[] {
   const cached = groupedCourses.get(entries);
@@ -74,79 +148,14 @@ export function openingCourses(entries: CatalogOpening[]): OpeningCourse[] {
   }
   const courses = [...groups]
     .map(([name, rows]) => {
-      const sorted = rows
-        .map(lineOf)
-        .sort((a, b) => foundationRank(a, name) - foundationRank(b, name) || lineOrder(a, b));
-      const unique = [
-        ...new Map(
-          [...sorted].reverse().map((line) => [`${line.root}|${line.moves.join(' ')}`, line]),
-        ).values(),
-      ].sort((a, b) => foundationRank(a, name) - foundationRank(b, name) || lineOrder(a, b));
-      const foundation = unique[0];
-      const leaves = unique
-        .filter(
-          (line) =>
-            line !== foundation &&
-            !unique.some(
-              (other) =>
-                other !== line &&
-                other.root === line.root &&
-                other.moves.length > line.moves.length &&
-                line.moves.every((move, index) => other.moves[index] === move),
-            ),
-        )
-        .sort(lineOrder);
-      const sections: CourseSection[] = [
-        {
-          id: 'foundation',
-          name: 'Foundation',
-          commonPgn: pgnOf(foundation.sans),
-          variationIndices: [0],
-        },
-      ];
-      const variations = [foundation.entry];
-      const remaining = new Set(leaves);
-      const shared: { lines: Line[]; depth: number; key: string }[] = [];
-      for (const depth of [8, 7, 6, 5, 4, 3]) {
-        const prefixes = new Map<string, Line[]>();
-        for (const line of remaining) {
-          if (line.moves.length < depth) continue;
-          const key = `${line.root}|${line.moves.slice(0, depth).join(' ')}`;
-          prefixes.set(key, [...(prefixes.get(key) || []), line]);
-        }
-        for (const [key, lines] of prefixes) {
-          if (lines.length < 2) continue;
-          lines.forEach((line) => remaining.delete(line));
-          shared.push({ lines: lines.sort(lineOrder), depth, key });
-        }
-      }
-      shared.sort((a, b) => lineOrder(a.lines[0], b.lines[0]) || compare(a.key, b.key));
-      for (const group of shared) {
-        const start = variations.length;
-        variations.push(...group.lines.map((line) => line.entry));
-        const sans = group.lines[0].sans.slice(0, group.depth);
-        sections.push({
-          id: `prefix:${group.key}`,
-          name: `After ${Math.ceil(group.depth / 2)}${group.depth % 2 ? '.' : '…'}${sans.at(-1)}`,
-          commonPgn: pgnOf(sans),
-          variationIndices: group.lines.map((_, index) => start + index),
-        });
-      }
-      if (remaining.size) {
-        const others = [...remaining].sort(lineOrder);
-        const start = variations.length;
-        variations.push(...others.map((line) => line.entry));
-        sections.push({
-          id: 'other-replies',
-          name: 'Other replies',
-          commonPgn: '',
-          variationIndices: others.map((_, index) => start + index),
-        });
-      }
+      const unique = longestLines(rows.map(lineOf).sort(lineOrder));
+      const side = sideFor(name);
+      const { variations, sections } = responseSections(unique, name);
       return {
         id: `course:${name}`,
         name,
-        side: sideFor(name),
+        side,
+        structure: 'responses-v1' as const,
         variations,
         sourceCount: rows.length,
         sections,

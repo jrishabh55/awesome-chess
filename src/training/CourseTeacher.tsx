@@ -8,6 +8,7 @@ import { OpeningLibrary } from './OpeningLibrary';
 import { databasePack } from './database';
 import { courseVariationLabel, type OpeningCourse } from './courses';
 import { courseProgress } from './course-progress';
+import { learningBatch } from './practice-batches';
 import { CourseSyllabus } from './CourseSyllabus';
 import {
   activeVariationIndex,
@@ -16,9 +17,11 @@ import {
   createCurriculum,
   guideStep,
   playDrillMove,
+  playCurriculumReply,
   recordHint,
   retryDrill,
   saveCurriculum,
+  loadCurriculum,
   startRound,
   type CurriculumSession,
 } from './curriculum';
@@ -50,6 +53,7 @@ export function CourseTeacher({
   const [drawingColor, setDrawingColor] = useState<DrawingColor>('red');
   const [annotations, setAnnotations] = useState<Record<string, Mark[]>>({});
   const [hint, setHint] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
   const [notice, setNotice] = useState('');
   const [storageError, setStorageError] = useState('');
   const [dialog, setDialog] = useState<
@@ -60,6 +64,7 @@ export function CourseTeacher({
   const entry = course.variations[index];
   const line = useMemo(() => databasePack(entry, course.side).lines[0], [entry, course.side]);
   const move = line.moves[session.ply];
+  const opponentTurn = !!move && move.before.split(' ')[1] !== course.side;
   const previousMove = line.moves[session.ply - 1];
   const fen = previousMove?.after || line.rootFen;
   const guided = session.phase === 'guide';
@@ -82,10 +87,19 @@ export function CourseTeacher({
   const score = learningProgress.points;
   const drillDone = session.phase === 'feedback';
   const roundDone = session.roundIndex + 1 >= session.round.length;
+  const batch = learningBatch(course, session.lesson);
+  const batchEnd = batch.variationIndices.at(-1)!;
+  const lessonSection = course.sections[batch.sectionIndex];
+  const sectionEnd = lessonSection.variationIndices.at(-1)!;
+  const sectionReviewNext = session.drill !== 'section' && session.lesson === sectionEnd;
   const nextLabel = roundDone
-    ? session.lesson + 1 >= course.variations.length
-      ? 'Finish course'
-      : 'Next variation'
+    ? sectionReviewNext
+      ? 'Start section drill'
+      : session.lesson + 1 >= course.variations.length
+        ? 'Finish course'
+        : session.lesson === sectionEnd
+          ? 'Next section'
+          : 'Next learning batch'
     : 'Next drill';
   const annotationKey = fen.split(' ').slice(0, 4).join(' ');
   const flip = () => setOrientation((value) => (value === 'w' ? 'b' : 'w'));
@@ -96,12 +110,13 @@ export function CourseTeacher({
     setNotice('');
   }
   function navigate(delta: number) {
+    setReviewing(delta <= 0);
     const asGuide = { ...session, phase: 'guide' as const };
     const next = guideStep(asGuide, line.moves.length, delta);
     update(next.ply === line.moves.length ? { ...next, phase: 'plans' } : next);
   }
   function play(uci: string) {
-    if (!active || dialog || conflict || (!guided && !drilling) || !move) return;
+    if (!active || dialog || conflict || opponentTurn || (!guided && !drilling) || !move) return;
     if (guided) {
       if (uci === move.uci) navigate(1);
       else
@@ -119,6 +134,7 @@ export function CourseTeacher({
     );
   }
   function advance() {
+    setReviewing(false);
     let next = continueCurriculum(course, session);
     if (next.phase === 'round-complete') next = continueCurriculum(course, next);
     update(next);
@@ -150,6 +166,22 @@ export function CourseTeacher({
       setStorageError(error instanceof Error ? error.message : 'Progress could not be saved.');
     }
   }, [course, session, active]);
+  useEffect(() => {
+    if (
+      !active ||
+      dialog ||
+      conflict ||
+      !opponentTurn ||
+      (!guided && !drilling) ||
+      (guided && reviewing)
+    )
+      return;
+    // Allow the learner's piece to finish travelling before the reply begins.
+    const timer = window.setTimeout(() => {
+      setSession((current) => playCurriculumReply(course, current, line));
+    }, 500);
+    return () => window.clearTimeout(timer);
+  }, [active, dialog, conflict, opponentTurn, guided, drilling, reviewing, course, line, session]);
   useEffect(() => {
     setHint(false);
     setNotice('');
@@ -216,7 +248,7 @@ export function CourseTeacher({
             onToggleMark: toggleMark,
             drawingMode,
             drawingColor,
-            disabled: !active || !!dialog || conflict || (!guided && !drilling),
+            disabled: !active || !!dialog || conflict || opponentTurn || (!guided && !drilling),
           }}
           tools={
             <BoardTools
@@ -284,7 +316,9 @@ export function CourseTeacher({
               <div className="ot-eyebrow">Saved on this device</div>
               <h2>{course.name}</h2>
               <p className="ot-description">
-                Continue your guided lessons, opening plans, and cumulative recall drills.
+                {session.history
+                  ? 'Your syllabus now follows full opening lines. Your earlier points and completed recalls are kept.'
+                  : 'Continue your full lines, batch drills, and section reviews.'}
               </p>
               <div className="ot-detail">
                 {course.sections.length} sections · Play {sideName(course.side)}
@@ -330,8 +364,12 @@ export function CourseTeacher({
                   {guided
                     ? 'Guided lesson'
                     : plansVisible
-                      ? 'Into the middlegame'
-                      : 'Recall practice'}
+                      ? 'Line complete'
+                      : session.practice === 'batches'
+                        ? session.drill === 'section'
+                          ? 'Section drill'
+                          : 'Batch drill'
+                        : 'Recall practice'}
                 </span>
                 <span>Play {sideName(course.side)}</span>
               </div>
@@ -342,7 +380,7 @@ export function CourseTeacher({
                 {section?.name}
                 {drilling || drillDone
                   ? ` · Drill ${session.roundIndex + 1} of ${session.round.length}`
-                  : ''}
+                  : ` · Learning ${batch.variationIndices.indexOf(session.lesson) + 1} of ${batch.variationIndices.length}`}
               </div>
               {guided ? (
                 <div className="ot-teaching-copy ct-copy">
@@ -378,13 +416,21 @@ export function CourseTeacher({
                   </p>
                   <p className="ct-secondary">
                     {roundDone
-                      ? `All ${session.round.length} learned variations practiced. ${session.lesson + 1 < course.variations.length ? 'Your next lesson is ready.' : 'You have reached the end of this course.'}`
+                      ? sectionReviewNext
+                        ? `Batch complete. Now recall all ${lessonSection.variationIndices.length} lines in this section in a fresh random order.`
+                        : session.lesson + 1 < course.variations.length
+                          ? 'Drill complete. Your next full-line lessons are ready.'
+                          : 'You have recalled every section in this course.'
                       : 'Continue to the next randomly selected variation.'}
                   </p>
                 </div>
               ) : (
                 <div className="ot-teaching-copy ct-copy" aria-live="polite">
-                  <h3>Your move as {sideName(course.side)}</h3>
+                  <h3>
+                    {opponentTurn
+                      ? 'Opponent replies automatically'
+                      : `Your move as ${sideName(course.side)}`}
+                  </h3>
                   <p className={notice ? 'ot-feedback' : ''} role={notice ? 'status' : undefined}>
                     {notice ||
                       (hint
@@ -417,12 +463,16 @@ export function CourseTeacher({
                     {plansVisible && (
                       <button
                         className="ot-primary"
-                        onClick={() => update(startRound(course, session))}
+                        onClick={() => {
+                          setReviewing(false);
+                          update(startRound(course, session));
+                        }}
                       >
-                        Practice{' '}
-                        {session.lesson + 1 === 1
-                          ? 'this variation'
-                          : `all ${session.lesson + 1} variations`}
+                        {session.lesson < batchEnd
+                          ? 'Next full line'
+                          : batch.variationIndices.length === 1
+                            ? 'Practice this variation'
+                            : `Practice these ${batch.variationIndices.length} variations`}
                         <ArrowRight size={16} />
                       </button>
                     )}
@@ -443,7 +493,7 @@ export function CourseTeacher({
                 ) : (
                   <button
                     className="ot-button"
-                    disabled={hint || conflict}
+                    disabled={hint || conflict || opponentTurn}
                     onClick={() => {
                       setHint(true);
                       setSession(recordHint(session));
@@ -465,7 +515,8 @@ export function CourseTeacher({
                 className="ot-text"
                 onClick={() => {
                   try {
-                    onChooseCourse(course);
+                    const saved = loadCurriculum(course.id);
+                    onChooseCourse(saved?.course || course);
                   } catch (error) {
                     setStorageError(
                       error instanceof Error
@@ -558,7 +609,12 @@ export function CourseTeacher({
                   <button
                     className="ot-primary"
                     onClick={() => {
-                      update({ ...createCurriculum(course), scores: session.scores });
+                      update({
+                        ...createCurriculum(course),
+                        scores: session.scores,
+                        history: session.history,
+                      });
+                      setReviewing(false);
                       setActive(true);
                       setDialog(null);
                     }}

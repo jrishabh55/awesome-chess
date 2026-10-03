@@ -4,6 +4,7 @@ import { builtInPacks, importPack } from './packs';
 import {
   createSession,
   playTrainingMove,
+  playTrainingReply,
   nextStage,
   guideStep,
   currentLine,
@@ -41,7 +42,7 @@ describe('opening course', () => {
     session = nextStage(pack, session);
     expect(nextStage(pack, session)).toEqual(session);
   });
-  it('keeps wrong moves off the board and automatically plays opponent replies', () => {
+  it('keeps wrong moves off the board and plays learner and opponent moves separately', () => {
     const pack = builtInPacks[0];
     let session = createSession(pack);
     session = nextStage(pack, { ...session, ply: pack.lines[0].moves.length });
@@ -51,15 +52,22 @@ describe('opening course', () => {
     expect(wrong.session.mistakes).toBe(1);
     const right = playTrainingMove(pack, wrong.session, 'e2e4');
     expect(right.correct).toBe(true);
-    expect(right.session.ply).toBe(2);
-    expect(new Chess(position(pack, right.session)).turn()).toBe('w');
+    expect(right.session.ply).toBe(1);
+    expect(new Chess(position(pack, right.session)).turn()).toBe('b');
+    expect(playTrainingMove(pack, right.session, 'e7e5').session).toBe(right.session);
+    const reply = playTrainingReply(pack, right.session);
+    expect(reply.ply).toBe(2);
+    expect(reply.mistakes).toBe(1);
+    expect(playTrainingReply(pack, reply)).toBe(reply);
   });
-  it('starts Black drills after the automatic White move', () => {
+  it('starts Black drills at the root so the automatic White move can animate', () => {
     const pack = builtInPacks.find((p) => p.side === 'b')!;
     const start = createSession(pack);
     const drill = nextStage(pack, { ...start, ply: pack.lines[0].moves.length });
-    expect(drill.ply).toBe(1);
-    expect(new Chess(position(pack, drill)).turn()).toBe('b');
+    expect(drill.ply).toBe(0);
+    expect(new Chess(position(pack, drill)).turn()).toBe('w');
+    expect(restoreProgress(serializeProgress(pack, drill))?.session).toEqual(drill);
+    expect(playTrainingReply(pack, drill).ply).toBe(1);
   });
   it('runs a whole course to completion and permits guide backtracking', () => {
     const pack = builtInPacks[0];
@@ -75,7 +83,10 @@ describe('opening course', () => {
         session = { ...session, ply: line.moves.length };
       else
         while (session.ply < line.moves.length)
-          session = playTrainingMove(pack, session, line.moves[session.ply].uci).session;
+          session =
+            line.moves[session.ply].before.split(' ')[1] === pack.side
+              ? playTrainingMove(pack, session, line.moves[session.ply].uci).session
+              : playTrainingReply(pack, session);
       session = nextStage(pack, session);
     }
     expect(session.stage).toBe(session.stages.length);
@@ -130,6 +141,23 @@ describe('opening course', () => {
       ),
     ).toBeNull();
   });
+});
+
+it('imports only the longest version of repeated move sequences while keeping divergent lines', () => {
+  const pack = importPack(
+    '1. e4 e5 *\n\n1. e4 e5 2. Nf3 *\n\n1. e4 e5 2. Nf3 Nc6 *\n\n1. e4 e5 2. Nf3 Nc6 *\n\n1. e4 c5 *',
+    'w',
+    'Compact lines',
+  );
+  expect(pack.lines.map((line) => line.moves.map((move) => move.san))).toEqual([
+    ['e4', 'e5', 'Nf3', 'Nc6'],
+    ['e4', 'c5'],
+  ]);
+});
+
+it('applies the import limit to distinct complete lines rather than duplicate source games', () => {
+  const pack = importPack(Array(41).fill('1. e4 e5 *').join('\n\n'), 'w', 'Repeated source');
+  expect(pack.lines).toHaveLength(1);
 });
 
 function branchedCommentPgn(commentLength: number): string {

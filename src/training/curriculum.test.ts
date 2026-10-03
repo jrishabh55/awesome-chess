@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { OpeningCourse } from './courses';
 import { databasePack } from './database';
+import { courseProgress } from './course-progress';
 import {
   createCurriculum,
   CurriculumConflictError,
@@ -8,6 +9,7 @@ import {
   guideStep,
   startRound,
   playDrillMove,
+  playCurriculumReply,
   recordHint,
   retryDrill,
   continueCurriculum,
@@ -16,6 +18,7 @@ import {
   loadCurricula,
   saveCurriculum,
   type CurriculumSession,
+  upgradeCurriculum,
 } from './curriculum';
 
 const course: OpeningCourse = {
@@ -44,7 +47,10 @@ const finish = (session: CurriculumSession, selected = course) => {
   let next = session;
   const line = lineAt(next, selected);
   while (next.phase === 'drill')
-    next = playDrillMove(selected, next, line, line.moves[next.ply].uci).session;
+    next =
+      line.moves[next.ply].before.split(' ')[1] === selected.side
+        ? playDrillMove(selected, next, line, line.moves[next.ply].uci).session
+        : playCurriculumReply(selected, next, line);
   return next;
 };
 let store: Map<string, string>;
@@ -81,24 +87,27 @@ it('requires plans before drills and clamps guide navigation without revealing d
   expect(guideStep(drill, 2, 1)).toEqual(drill);
   expect(drill.phase).toBe('drill');
 });
-it('drills every learned line cumulatively across section boundaries and finishes the course', () => {
-  let session = createCurriculum(course);
-  for (let lesson = 0; lesson < 3; lesson++) {
-    expect(session.lesson).toBe(lesson);
-    session = startRound(course, plans(session), () => 0);
-    expect([...session.round].sort()).toEqual(
-      Array.from({ length: lesson + 1 }, (_, index) => index),
-    );
-    for (let index = 0; index <= lesson; index++) {
-      session = finish(session);
-      expect(session.phase).toBe('feedback');
-      session = continueCurriculum(course, session);
-    }
-    expect(session.phase).toBe('round-complete');
-    session = continueCurriculum(course, session);
-  }
-  expect(session.phase).toBe('complete');
-  expect(Object.values(session.scores).reduce((sum, score) => sum + score.best, 0)).toBe(60);
+it('preserves a running legacy cumulative queue before switching to section practice', () => {
+  const session: CurriculumSession = {
+    ...createCurriculum(course),
+    practice: undefined,
+    drill: undefined,
+    lesson: 1,
+    phase: 'drill',
+    round: [1, 0],
+    ply: 0,
+    scores: { '0:0': { best: 10, attempts: 1 } },
+  };
+  saveCurriculum(course, session);
+  expect(loadCurriculum()?.session.round).toEqual([1, 0]);
+  let next = finish(session);
+  expect(next.scores['1:1']).toEqual({ best: 10, attempts: 1 });
+  next = continueCurriculum(course, next);
+  next = finish(next);
+  next = continueCurriculum(course, continueCurriculum(course, next));
+  expect(next).toMatchObject({ phase: 'guide', lesson: 2, practice: 'batches' });
+  saveCurriculum(course, next);
+  expect(loadCurriculum()?.session).toEqual(next);
 });
 it('flags mistakes, tracks hints, and upgrades retry best scores without farming points', () => {
   let session = startRound(course, plans(createCurriculum(course)), () => 0);
@@ -109,23 +118,43 @@ it('flags mistakes, tracks hints, and upgrades retry best scores without farming
   session = recordHint(wrong.session);
   expect(session.hints).toBe(1);
   session = finish(session);
-  expect(session.scores['0:0']).toEqual({ best: 5, attempts: 1 });
+  expect(session.scores['batch:0:0']).toEqual({ best: 5, attempts: 1 });
   session = retryDrill(course, session, line);
   expect(session.mistakes).toBe(0);
   expect(session.roundIndex).toBe(0);
   session = finish(session);
-  expect(session.scores['0:0']).toEqual({ best: 10, attempts: 2 });
+  expect(session.scores['batch:0:0']).toEqual({ best: 10, attempts: 2 });
   session = finish(retryDrill(course, session, line));
-  expect(session.scores['0:0']).toEqual({ best: 10, attempts: 3 });
+  expect(session.scores['batch:0:0']).toEqual({ best: 10, attempts: 3 });
   expect(Object.values(session.scores)).toHaveLength(1);
 });
-it('plays the opening White move automatically for a Black course', () => {
+it('starts Black recall at the root so White’s opening move can animate', () => {
   const black = { ...course, side: 'b' as const };
   const session = startRound(black, plans(createCurriculum(black)), () => 0);
-  expect(session.ply).toBe(1);
-  expect(playDrillMove(black, session, lineAt(session, black), 'c7c5').session.phase).toBe(
-    'feedback',
+  expect(session.ply).toBe(0);
+  saveCurriculum(black, session);
+  expect(loadCurriculum()?.session).toEqual(session);
+  const reply = playCurriculumReply(black, session, lineAt(session, black));
+  expect(reply.ply).toBe(1);
+  expect(playDrillMove(black, reply, lineAt(reply, black), 'c7c5').session.phase).toBe('feedback');
+});
+it('shows the learner’s move before the automatic reply and awards points after the final reply', () => {
+  const session = startRound(course, plans(createCurriculum(course)), () => 0);
+  const result = playDrillMove(course, session, lineAt(session), 'e2e4');
+  expect(result.correct).toBe(true);
+  expect(result.session.ply).toBe(1);
+  expect(result.session.phase).toBe('drill');
+  expect(result.session.scores).toEqual({});
+  expect(playDrillMove(course, result.session, lineAt(session), 'c7c5').session).toBe(
+    result.session,
   );
+  saveCurriculum(course, result.session);
+  expect(loadCurriculum()?.session).toEqual(result.session);
+  const reply = playCurriculumReply(course, result.session, lineAt(session));
+  expect(reply.ply).toBe(2);
+  expect(reply.phase).toBe('feedback');
+  expect(reply.scores['batch:0:0']).toEqual({ best: 10, attempts: 1 });
+  expect(playCurriculumReply(course, reply, lineAt(session))).toBe(reply);
 });
 it('roundtrips raw courses larger than40lines, preserving queue order and previous teacher data', () => {
   const big = {
@@ -200,7 +229,7 @@ it('preserves each course and selects the latest active one without losing previ
 });
 it('retains best-score ledgers on restart, including scores from later lessons', () => {
   const ledger = {
-    '0:0': { best: 10, attempts: 1 },
+    'batch:0:0': { best: 10, attempts: 1 },
     '1:0': { best: 10, attempts: 1 },
     '1:1': { best: 5, attempts: 2 },
   };
@@ -208,7 +237,7 @@ it('retains best-score ledgers on restart, including scores from later lessons',
   saveCurriculum(course, restarted);
   expect(loadCurriculum()?.session.scores).toEqual(ledger);
   const completed = finish(startRound(course, plans(restarted), () => 0));
-  expect(completed.scores['0:0']).toEqual({ best: 10, attempts: 2 });
+  expect(completed.scores['batch:0:0']).toEqual({ best: 10, attempts: 2 });
   expect(completed.scores['1:1']).toEqual({ best: 5, attempts: 2 });
 });
 it('migrates the earlier single-course snapshot while preserving its progress', () => {
@@ -236,7 +265,7 @@ it('rejects stale same-course progress and score overwrites while preserving the
     CurriculumConflictError,
   );
   expect(store.get(CURRICULUM_KEY)).toBe(saved);
-  expect(loadCurriculum(course.id)?.session.scores['0:0'].best).toBe(10);
+  expect(loadCurriculum(course.id)?.session.scores['batch:0:0'].best).toBe(10);
   expect(() => saveCurriculum(course, initial, null)).toThrow(/reload.*course/i);
 });
 it('allows independent course saves and compares expected sessions canonically', () => {
@@ -261,4 +290,83 @@ it('rejects replacing variation identities underneath an existing score ledger',
   };
   expect(() => saveCurriculum(changed, initial, initial)).toThrow(CurriculumConflictError);
   expect(loadCurriculum(course.id)?.course).toEqual(course);
+});
+
+it('upgrades old indexed syllabuses while retaining points and matching full-line recall only', () => {
+  const session: CurriculumSession = {
+    ...createCurriculum(course),
+    practice: undefined,
+    drill: undefined,
+    phase: 'guide',
+    lesson: 1,
+    scores: { '0:0': { best: 10, attempts: 2 } },
+  };
+  saveCurriculum(course, session, null);
+  const rebuilt: OpeningCourse = {
+    ...course,
+    structure: 'responses-v1',
+    variations: [course.variations[2], course.variations[0], course.variations[1]],
+    sections: [
+      { id: 'responses', name: 'Full responses', commonPgn: '', variationIndices: [0, 1, 2] },
+    ],
+  };
+  const upgraded = upgradeCurriculum({ course, session }, rebuilt);
+  expect(upgraded.session).toMatchObject({
+    lesson: 0,
+    phase: 'guide',
+    scores: {},
+    history: { points: 10 },
+  });
+  saveCurriculum(rebuilt, upgraded.session, session, course);
+  expect(loadCurriculum()).toEqual(upgraded);
+  expect(upgradeCurriculum(upgraded, rebuilt)).toBe(upgraded);
+  const longer = {
+    ...rebuilt,
+    variations: rebuilt.variations.map((entry) =>
+      entry.id === 'a' ? { ...entry, pgn: '1. e4 c5 2. Nf3' } : entry,
+    ),
+  };
+  expect(courseProgress(rebuilt, upgraded.session)).toMatchObject({
+    points: 10,
+    learned: 1,
+    completed: false,
+  });
+  expect(courseProgress(rebuilt, upgraded.session).variations[1]).toMatchObject({
+    best: 10,
+    attempts: 2,
+  });
+  expect(courseProgress(longer, upgradeCurriculum(upgraded, longer).session)).toMatchObject({
+    points: 10,
+    learned: 0,
+  });
+  expect(() => saveCurriculum(course, session, session)).toThrow(CurriculumConflictError);
+  expect(loadCurriculum()).toEqual(upgraded);
+});
+
+it('compares carried recall records canonically and retains history across restart saves', () => {
+  const saved = {
+    course,
+    session: finish(startRound(course, plans(createCurriculum(course)), () => 0)),
+  };
+  const changed: OpeningCourse = {
+    ...course,
+    structure: 'responses-v1',
+    sections: [{ id: 'all', name: 'All lines', commonPgn: '', variationIndices: [0, 1, 2] }],
+  };
+  const upgraded = upgradeCurriculum(saved, changed);
+  saveCurriculum(changed, upgraded.session, null);
+  const expected = {
+    ...upgraded.session,
+    history: {
+      points: upgraded.session.history!.points,
+      recalls: Object.fromEntries(
+        Object.entries(upgraded.session.history!.recalls).map(([key, score]) => [
+          key,
+          { attempts: score.attempts, best: score.best },
+        ]),
+      ),
+    },
+  };
+  saveCurriculum(changed, guideStep(upgraded.session, 2, 1), expected);
+  expect(loadCurriculum()?.session.history).toEqual(upgraded.session.history);
 });

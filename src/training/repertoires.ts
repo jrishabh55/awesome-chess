@@ -2,7 +2,7 @@ import type { Color } from '../chess/types';
 import type { CatalogOpening } from '../openings/catalog';
 import { databasePack } from './database';
 import { MAX_PROGRESS_CHARS, OVERSIZED_COURSE_MESSAGE, SESSION_RESERVE_CHARS } from './limits';
-import type { OpeningPack, TeachingLine } from './packs';
+import { longestTeachingLines, type OpeningPack, type TeachingLine } from './packs';
 
 export interface Repertoire {
   id: string;
@@ -101,7 +101,7 @@ function packFrom(rep: Repertoire, lines: TeachingLine[]): OpeningPack {
     side: rep.side,
     description:
       'Your saved opening variations. Learn each line, practice earlier lines, then finish with a shuffled drill of the whole repertoire.',
-    lines,
+    lines: longestTeachingLines(lines),
   };
 }
 function assertCourseSize(pack: OpeningPack) {

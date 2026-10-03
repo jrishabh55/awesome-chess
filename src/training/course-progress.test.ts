@@ -4,7 +4,7 @@ import { createCurriculum } from './curriculum';
 import { courseProgress } from './course-progress';
 
 const course = openingCourses([
-  { id: 'a', eco: 'B20', name: 'Sicilian Defense', pgn: '1. e4 c5' },
+  { id: 'a', eco: 'B20', name: 'Sicilian Defense', pgn: '1. e4 c5 2. a3' },
   { id: 'b', eco: 'B50', name: 'Sicilian Defense: Open', pgn: '1. e4 c5 2. Nf3 d6 3. d4' },
   { id: 'c', eco: 'B23', name: 'Sicilian Defense: Closed', pgn: '1. e4 c5 2. Nc3 Nc6 3. g3' },
 ])[0];

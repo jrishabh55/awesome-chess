@@ -11,7 +11,7 @@ async function openCourses(page: Page) {
   return page.getByRole('combobox', { name: 'Opening course', exact: true });
 }
 
-test('London search selects one complete course with shared-start sections', async ({ page }) => {
+test('London search selects one complete course with opening-line sections', async ({ page }) => {
   const search = await openCourses(page);
   await expect(search).toBeVisible();
   await search.fill('London');
@@ -43,6 +43,15 @@ async function move(page: Page, uci: string) {
 }
 async function finishDrill(page: Page) {
   for (let guard = 0; guard < 120; guard++) {
+    await expect
+      .poll(async () => {
+        const { course, session } = await progress(page);
+        if (session.phase !== 'drill') return true;
+        const chess = new Chess();
+        chess.loadPgn(course.variations[session.round[session.roundIndex]].pgn);
+        return chess.history({ verbose: true })[session.ply].color === course.side;
+      })
+      .toBe(true);
     const { course, session } = await progress(page);
     if (session.phase !== 'drill') break;
     const chess = new Chess();
@@ -53,12 +62,24 @@ async function finishDrill(page: Page) {
   await expect(page.getByRole('button', { name: 'Retry drill', exact: true })).toBeVisible();
 }
 async function finishLesson(page: Page) {
-  await page.getByRole('button', { name: 'Go to end', exact: true }).click();
-  await expect(page.getByText('Into the middlegame', { exact: true })).toBeVisible();
-  await expect(page.locator('.ct-plan-list li').first()).toBeVisible();
-  await page
-    .getByRole('button', { name: /^Practice (this variation|all \d+ variations)$/ })
-    .click();
+  for (let guard = 0; guard < 5; guard++) {
+    const { session } = await progress(page);
+    if (session.phase === 'drill') break;
+    if (session.phase === 'guide')
+      await page.getByRole('button', { name: 'Go to end', exact: true }).click();
+    await expect(page.getByText('Line complete', { exact: true })).toBeVisible();
+    await page
+      .getByRole('button', {
+        name: /^(Next full line|Practice this variation|Practice these \d+ variations)$/,
+      })
+      .click();
+    await expect
+      .poll(async () => {
+        const next = (await progress(page)).session;
+        return next.phase === 'drill' || next.lesson > session.lesson;
+      })
+      .toBe(true);
+  }
   await expect(page.locator('.board-overlay > path')).toHaveCount(0);
 }
 
@@ -82,8 +103,10 @@ test('Learned tracks variation recall, preserves catalog entries, and survives r
   await expect(card).toContainText(`1/${total} learned`);
   await expect(card).toContainText('5 pts');
   await card.click();
-  await page.getByRole('button', { name: /Foundation.*1\/1 learned/ }).click();
-  await expect(page.locator('.course-variation')).toContainText('Learned · practice again');
+  await page.locator('.course-section-toggle').first().click();
+  await expect(page.locator('.course-variation.is-learned').first()).toContainText(
+    'Learned · practice again',
+  );
   await page.getByRole('tab', { name: 'Courses', exact: true }).click();
   await search.fill('London');
   await expect(page.getByRole('option', { name: 'London System', exact: true })).toContainText(
@@ -103,8 +126,10 @@ test('Learned tracks variation recall, preserves catalog entries, and survives r
   await expect(card).toContainText(`1/${total} learned`);
   await expect(card).toContainText('10 pts');
   await card.click();
-  await page.getByRole('button', { name: /Foundation.*1\/1 learned/ }).click();
-  await expect(page.locator('.course-variation')).toContainText('Learned · clean recall');
+  await page.locator('.course-section-toggle').first().click();
+  await expect(page.locator('.course-variation.is-learned').first()).toContainText(
+    'Learned · clean recall',
+  );
   await page.screenshot({ path: '/tmp/chess-learned-progress.png' });
 });
 
@@ -153,8 +178,10 @@ test('completed history survives a restart, loads without the catalog, and updat
   await expect(
     page.getByRole('progressbar', { name: 'Variations learned', exact: true }),
   ).toHaveAttribute('value', '1');
-  await page.getByRole('button', { name: /Foundation.*1\/1 learned/ }).click();
-  await expect(page.locator('.course-variation')).toContainText('Learned · clean recall');
+  await page.locator('.course-section-toggle').first().click();
+  await expect(page.locator('.course-variation.is-learned').first()).toContainText(
+    'Learned · clean recall',
+  );
   await page.getByRole('button', { name: 'Close opening dialog', exact: true }).click();
   await page.getByRole('button', { name: 'Resume course', exact: true }).click();
   await page.getByRole('button', { name: 'Restart course', exact: true }).click();
@@ -217,70 +244,6 @@ for (const viewport of [
     });
   });
 }
-
-test('lessons advance automatically through cumulative unhinted rounds and clean retries upgrade points', async ({
-  page,
-}) => {
-  const search = await openCourses(page);
-  await search.fill('London');
-  await page.getByRole('option', { name: 'London System', exact: true }).click();
-  await page.getByRole('button', { name: 'Start London System', exact: true }).click();
-  await page.getByRole('button', { name: 'Next move', exact: true }).click();
-  await expect(page.getByRole('heading', { name: /^Black: / })).toBeVisible();
-  await expect(page.locator('.ct-copy > p').first()).not.toContainText(
-    'Follow the arrow and remember',
-  );
-  await finishLesson(page);
-  await move(page, 'e2e4');
-  await expect(page.getByText(/Incorrect move\. Try again/)).toBeVisible();
-  await finishDrill(page);
-  await expect(
-    page.getByRole('button', { name: 'Course score: 5 points', exact: true }),
-  ).toBeVisible();
-  await page.getByRole('button', { name: 'Retry drill', exact: true }).click();
-  await expect(page.locator('.board-overlay > path')).toHaveCount(0);
-  await finishDrill(page);
-  await expect(
-    page.getByRole('button', { name: 'Course score: 10 points', exact: true }),
-  ).toBeVisible();
-  await page.getByRole('button', { name: 'Next variation', exact: true }).click();
-  for (let lesson = 1; lesson <= 2; lesson++) {
-    await expect(page.getByText('Guided lesson', { exact: true })).toBeVisible();
-    expect((await progress(page)).session.lesson).toBe(lesson);
-    await finishLesson(page);
-    const round = (await progress(page)).session.round;
-    expect([...round].sort()).toEqual(Array.from({ length: lesson + 1 }, (_, index) => index));
-    const seen: number[] = [];
-    for (let drill = 0; drill <= lesson; drill++) {
-      const current = (await progress(page)).session;
-      seen.push(current.round[current.roundIndex]);
-      await expect(page.locator('.board-overlay > path')).toHaveCount(0);
-      await finishDrill(page);
-      await page
-        .getByRole('button', {
-          name: drill < lesson ? 'Next drill' : 'Next variation',
-          exact: true,
-        })
-        .click();
-    }
-    expect(new Set(seen).size).toBe(lesson + 1);
-  }
-  await expect(
-    page.getByRole('button', { name: 'Course score: 60 points', exact: true }),
-  ).toBeVisible();
-  const saved = await progress(page);
-  expect(saved.session.scores['0:0']).toEqual({ best: 10, attempts: 2 });
-  await page.reload();
-  await page
-    .getByRole('navigation', { name: 'Workspace', exact: true })
-    .getByRole('button', { name: 'Opening teacher', exact: true })
-    .click();
-  await page.getByRole('button', { name: 'Resume course', exact: true }).click();
-  expect((await progress(page)).session).toEqual(saved.session);
-  await expect(
-    page.getByRole('button', { name: 'Course score: 60 points', exact: true }),
-  ).toBeVisible();
-});
 
 test('Sicilian includes its full database course and switching openings preserves separate progress', async ({
   page,
@@ -400,7 +363,7 @@ for (const viewport of [
         ).toBeVisible();
         expect(await page.locator('.ct-full-ideas li').count()).toBeGreaterThan(1);
         await page.getByRole('button', { name: 'Close opening dialog', exact: true }).click();
-        await page.getByRole('button', { name: 'Practice this variation', exact: true }).click();
+        await finishLesson(page);
       }
     }
   });

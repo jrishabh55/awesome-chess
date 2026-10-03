@@ -6,6 +6,7 @@ import {
   currentLine,
   nextStage,
   playTrainingMove,
+  playTrainingReply,
   PROGRESS_KEY,
   restoreProgress,
   serializeProgress,
@@ -62,6 +63,20 @@ it('deduplicates both database identity and legal move sequences with different 
   expect(addRepertoireOpening(rep, sicilian).openings).toHaveLength(1);
   const alias = { ...sicilian, id: 'alias', name: 'Same position', pgn: '1. e4 {center} c5 *' };
   expect(addRepertoireOpening(rep, alias).openings).toHaveLength(1);
+});
+it('practices only the longest prefix lines without removing editable repertoire entries', () => {
+  const middle = { ...sicilian, id: 'middle', pgn: '1. e4 c5 2. Nf3' };
+  const longest = { ...sicilian, id: 'longest', pgn: '1. e4 c5 2. Nf3 d6' };
+  const divergent = { ...sicilian, id: 'divergent', pgn: '1. e4 c5 2. Nc3' };
+  let rep = createRepertoire('Complete branches', 'w');
+  for (const entry of [sicilian, middle, longest, divergent])
+    rep = addRepertoireOpening(rep, entry);
+  const pack = repertoirePack(rep);
+  expect(pack.lines.map((line) => line.moves.map((move) => move.san))).toEqual([
+    ['e4', 'c5', 'Nf3', 'd6'],
+    ['e4', 'c5', 'Nc3'],
+  ]);
+  expect(rep.openings).toHaveLength(4);
 });
 it('rejects blank names, illegal moves, and lines with no move for the repertoire side', () => {
   expect(() => createRepertoire('  ', 'w')).toThrow(/name/i);
@@ -132,7 +147,10 @@ it('builds and finishes a multi-family course with the normal progressive practi
       session = { ...session, ply: line.moves.length };
     else
       while (session.ply < line.moves.length)
-        session = playTrainingMove(pack, session, line.moves[session.ply].uci).session;
+        session =
+          line.moves[session.ply].before.split(' ')[1] === pack.side
+            ? playTrainingMove(pack, session, line.moves[session.ply].uci).session
+            : playTrainingReply(pack, session);
     session = nextStage(pack, session);
   }
   expect(session.stage).toBe(7);
