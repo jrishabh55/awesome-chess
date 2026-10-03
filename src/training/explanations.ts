@@ -1,11 +1,12 @@
 import { Chess, SQUARES, type Move, type PieceSymbol, type Square } from 'chess.js';
-import type { Color } from '../chess/types';
+import type { Color, DrawingColor, Mark } from '../chess/types';
 import type { TeachingLine } from './packs';
 
 export interface MoveExplanation {
   title: string;
   summary: string;
   thought: string;
+  thoughtMarks: Mark[];
   ideas: string[];
 }
 export interface OpeningPlans {
@@ -117,6 +118,7 @@ export function explainOpeningMove(
       title: 'Variation complete',
       summary: 'Review the final position and the plans for both sides.',
       thought: '',
+      thoughtMarks: [],
       ideas: [],
     };
   const before = new Chess(entry.before);
@@ -246,39 +248,68 @@ export function explainOpeningMove(
   const theme = moveTheme(family(courseName, line), before, after, move);
   const summary = authoredNote(entry.note) || theme || facts[0];
   let thought = `I move to ${move.to} to change my activity and help our pieces work together.`;
+  let thoughtMarks: Mark[] = [{ kind: 'square', square: move.to, color: 'green' }];
+  // Keep the highlighted squares paired with the selected sentence, not every
+  // fact we calculated for the sidebar. A capture overrides its green destination.
+  const say = (sentence: string, squares: Square[] = [], color: DrawingColor = 'green') => {
+    thought = sentence;
+    const colors = new Map<Square, DrawingColor>([[move.to, 'green']]);
+    for (const square of squares) colors.set(square, color);
+    thoughtMarks = [...colors].map(([square, color]) => ({ kind: 'square', square, color }));
+  };
   if (
     (move.piece === 'n' || move.piece === 'b') &&
     move.from[1] === homeRank &&
     move.to[1] !== homeRank
   )
-    thought = `I develop to ${move.to}, bringing another piece into play.`;
+    say(`I develop to ${move.to}, bringing another piece into play.`);
   if (move.piece === 'p') {
     const controlled = newCenter.length
       ? newCenter
       : SQUARES.filter((square) => attacks(after, move.to, square, move.color));
-    thought = controlled.length
-      ? `From ${move.to}, I control ${controlled.join(' and ')}${newCenter.length ? ' in the center' : ''}.`
-      : `I advance to ${move.to}, changing our pawn structure.`;
+    say(
+      controlled.length
+        ? `From ${move.to}, I control ${controlled.join(' and ')}${newCenter.length ? ' in the center' : ''}.`
+        : `I advance to ${move.to}, changing our pawn structure.`,
+      controlled,
+      'blue',
+    );
   }
   if (newCenter.length && move.piece !== 'p')
-    thought = `From ${move.to}, I control ${newCenter.join(' and ')} in the center.`;
+    say(`From ${move.to}, I control ${newCenter.join(' and ')} in the center.`, newCenter, 'blue');
   if (supported.length)
-    thought = `From ${move.to}, I help defend our central pawn${supported.length > 1 ? 's' : ''} on ${supported.join(' and ')}.`;
+    say(
+      `From ${move.to}, I help defend our central pawn${supported.length > 1 ? 's' : ''} on ${supported.join(' and ')}.`,
+      supported,
+      'blue',
+    );
   if (newTargets.length) {
     const target = newTargets[0];
-    thought = `From ${move.to}, I attack ${enemy}’s ${names[after.get(target)!.type]} on ${target}.`;
+    say(
+      `From ${move.to}, I attack ${enemy}’s ${names[after.get(target)!.type]} on ${target}.`,
+      [target],
+      'red',
+    );
   }
   if (move.captured)
-    thought = `I capture ${enemy}’s ${names[move.captured]} ${move.isEnPassant() ? 'en passant, landing ' : ''}on ${move.to}.`;
-  if (move.promotion) thought = `I promote to a ${names[move.promotion]} on ${move.to}.`;
-  if (move.isKingsideCastle() || move.isQueensideCastle())
-    thought = `I castle to ${move.to}, bringing our rook to ${move.isKingsideCastle() ? 'f' : 'd'}${move.color === 'w' ? '1' : '8'}.`;
+    say(
+      `I capture ${enemy}’s ${names[move.captured]} ${move.isEnPassant() ? 'en passant, landing ' : ''}on ${move.to}.`,
+      [move.to],
+      'red',
+    );
+  if (move.promotion) say(`I promote to a ${names[move.promotion]} on ${move.to}.`);
+  if (move.isKingsideCastle() || move.isQueensideCastle()) {
+    const rook =
+      `${move.isKingsideCastle() ? 'f' : 'd'}${move.color === 'w' ? '1' : '8'}` as Square;
+    say(`I castle to ${move.to}, bringing our rook to ${rook}.`, [rook]);
+  }
   if (after.isCheck()) thought += ` ${enemy} must answer my check.`;
-  if (after.isCheckmate()) thought = `I move to ${move.to} and deliver checkmate!`;
+  if (after.isCheckmate()) say(`I move to ${move.to} and deliver checkmate!`);
   return {
     title: `${side}: ${move.san}`,
     summary,
     thought,
+    thoughtMarks,
     ideas: [...new Set([...(theme && theme !== summary ? [theme] : []), ...facts])]
       .filter((idea) => idea !== summary)
       .slice(0, 3),

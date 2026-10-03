@@ -30,6 +30,36 @@ const text = (explanation: { summary?: string; ideas: string[] }) =>
   [explanation.summary, ...explanation.ideas].join(' ');
 
 describe('position-aware opening explanations', () => {
+  it('colors only the squares described by the current thought', () => {
+    const examples = [
+      { moves: 'e4 e5 Nf3 Nc6', ply: 0, marks: { e4: 'green', d5: 'blue' } },
+      { moves: 'e4 e5 Nf3 Nc6', ply: 2, marks: { f3: 'green', e5: 'red' } },
+      { moves: 'e4 e5 Nf3 Nc6', ply: 3, marks: { c6: 'green', e5: 'blue' } },
+      { moves: 'd4 d5 c4 dxc4', ply: 3, marks: { c4: 'red' } },
+      { moves: 'e4 e5 Nf3 Nc6 Bc4 Nf6 O-O', ply: 6, marks: { g1: 'green', f1: 'green' } },
+      { moves: 'h3', ply: 0, marks: { h3: 'green', g4: 'blue' } },
+      { moves: 'a8=N', fen: '7k/P7/8/8/8/8/8/7K w - - 0 1', ply: 0, marks: { a8: 'green' } },
+      { moves: 'f3 e5 g4 Qh4#', ply: 3, marks: { h4: 'green' } },
+    ];
+    for (const example of examples) {
+      const explanation = explainOpeningMove(
+        'Custom',
+        line(example.moves, example.fen),
+        example.ply,
+      );
+      expect(explanation.thoughtMarks).toHaveLength(Object.keys(example.marks).length);
+      expect(
+        Object.fromEntries(
+          explanation.thoughtMarks.map((mark) => [
+            mark.kind === 'square' ? mark.square : 'unexpected-arrow',
+            mark.color,
+          ]),
+        ),
+      ).toEqual(example.marks);
+    }
+    expect(explainOpeningMove('Custom', line('e4'), 1).thoughtMarks).toEqual([]);
+  });
+
   it('lets either side’s piece explain its actual activity in a short thought', () => {
     const opening = line('e4 e5 Nf3 Nc6');
     expect(explainOpeningMove('Custom', opening, 0).thought).toMatch(/I.*d5/);

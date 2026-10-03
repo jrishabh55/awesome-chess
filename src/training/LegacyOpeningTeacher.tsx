@@ -5,6 +5,7 @@ import { BoardTools, type DrawingMode } from '../board/BoardTools';
 import { BoardNavigation } from '../board/BoardNavigation';
 import { useMoveKeyPacing } from '../board/useMoveKeyPacing';
 import { MoveThought } from './MoveThought';
+import { explainOpeningMove } from './explanations';
 import { OpeningLibrary } from './OpeningLibrary';
 import type { OpeningCourse } from './courses';
 import type { Color, DrawingColor, Mark, Square } from '../chess/types';
@@ -204,6 +205,8 @@ export function LegacyOpeningTeacher({
           ...(guided ? move.marks : []),
         ]
       : [];
+  if (active && guided)
+    marks.push(...explainOpeningMove(pack.name, line, Math.max(0, session.ply - 1)).thoughtMarks);
   const nextKind = session.stages[session.stage + 1]?.kind;
   const continueLabel = !nextKind
     ? 'Finish course'

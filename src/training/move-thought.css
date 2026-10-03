@@ -14,11 +14,15 @@
   position: absolute;
   width: min(220px, calc(100% - 8px));
   padding: clamp(6px, 3cqw, 10px) clamp(8px, 4cqw, 15px) clamp(8px, 3cqw, 12px);
-  border: 2px solid #b9c89d;
+  border: 2px solid #f6ffe7b3;
   border-radius: 27px;
-  background: #f8faef;
+  background: linear-gradient(135deg, #fbfff199, #edf6e073);
+  backdrop-filter: blur(9px) saturate(125%);
+  -webkit-backdrop-filter: blur(9px) saturate(125%);
   color: #293321;
-  box-shadow: 0 4px 16px #0003;
+  box-shadow:
+    0 6px 20px #17211126,
+    inset 0 1px 0 #ffffff80;
   font-size: clamp(10px, 4cqw, 13px);
   line-height: 1.4;
 }
@@ -28,9 +32,11 @@
   position: absolute;
   width: 11px;
   height: 9px;
-  border: 2px solid #b9c89d;
+  border: 2px solid #f6ffe7b3;
   border-radius: 50%;
-  background: #f8faef;
+  background: #f4fae980;
+  backdrop-filter: blur(6px) saturate(125%);
+  -webkit-backdrop-filter: blur(6px) saturate(125%);
   left: var(--thought-tail);
 }
 .move-thought.above::before {

@@ -230,6 +230,10 @@ export function CourseTeacher({
           ...(guided ? move.marks : []),
         ]
       : [];
+  if (active && (guided || plansVisible))
+    coachMarks.push(
+      ...explainOpeningMove(course.name, line, Math.max(0, session.ply - 1)).thoughtMarks,
+    );
 
   return (
     <section className="opening-teacher curriculum-teacher" aria-label="Opening Teacher">

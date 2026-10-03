@@ -66,6 +66,42 @@ test('thought bubbles follow the played piece, flip with the board, and retain t
 test('recall drills do not reveal move thoughts', async ({ page }) => {
   await teacher(page, 'drill');
   await expect(page.getByRole('status', { name: 'Move thought' })).toHaveCount(0);
+  await expect(page.locator('.board-overlay rect')).toHaveCount(0);
+});
+
+test('bubble squares use the existing highlight design and follow each explanation', async ({
+  page,
+}) => {
+  await teacher(page);
+  const mark = (x: number, y: number, color: string) =>
+    page.locator(`.board-overlay rect[x="${x}"][y="${y}"][fill="${color}"]`);
+  await expect(mark(4, 4, '#8fbb55')).toHaveAttribute('opacity', '.65');
+  await expect(mark(3, 3, '#57a1de')).toHaveAttribute('opacity', '.65');
+  await page.getByRole('button', { name: 'Next move', exact: true }).click();
+  await expect(page.getByRole('status', { name: 'Move thought' })).toHaveAttribute(
+    'data-square',
+    'e5',
+  );
+  await expect(mark(4, 3, '#8fbb55')).toBeVisible();
+  await expect(mark(3, 4, '#57a1de')).toBeVisible();
+  await expect(mark(3, 3, '#57a1de')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Next move', exact: true }).click();
+  await expect(page.getByRole('status', { name: 'Move thought' })).toHaveAttribute(
+    'data-square',
+    'f3',
+  );
+  await expect(mark(5, 5, '#8fbb55')).toBeVisible();
+  await expect(mark(4, 3, '#f65c54')).toBeVisible();
+  await page.keyboard.press('x');
+  await expect(mark(2, 2, '#8fbb55')).toBeVisible();
+  await expect(mark(3, 4, '#f65c54')).toBeVisible();
+  await expect(page.getByRole('status', { name: 'Move thought' })).toHaveAttribute(
+    'data-square',
+    'c6',
+  );
+  await expect(mark(5, 5, '#8fbb55')).toBeVisible();
+  await expect(mark(3, 4, '#57a1de')).toBeVisible();
+  await expect(mark(3, 4, '#f65c54')).toHaveCount(0);
 });
 
 test('mobile thoughts stay inside the board and do not intercept piece input', async ({ page }) => {
