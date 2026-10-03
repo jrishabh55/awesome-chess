@@ -35,7 +35,6 @@ export function MoveThought({
     <ThoughtBubble
       square={square}
       orientation={orientation}
-      title={`${ply ? '' : 'Next · '}${explanation.title}`}
       text={ply ? explanation.thought : explanation.thought.replace(/\bI /, 'I’ll ')}
       icon={`${piece.color}${piece.type.toUpperCase()}`}
       opacity={preferences.bubbleOpacity / 100}
@@ -48,7 +47,6 @@ export function MoveThought({
 function ThoughtBubble({
   square,
   orientation,
-  title,
   text,
   icon,
   opacity,
@@ -57,7 +55,6 @@ function ThoughtBubble({
 }: {
   square: Square;
   orientation: Color;
-  title: string;
   text: string;
   icon: string;
   opacity: number;
@@ -93,7 +90,7 @@ function ThoughtBubble({
     observer.observe(container);
     observer.observe(cloud);
     return () => observer.disconnect();
-  }, [point.x, point.y, above, title, text]);
+  }, [point.x, point.y, above, text]);
   return (
     <div className="move-thought-layer" ref={layer}>
       <span
@@ -125,11 +122,10 @@ function ThoughtBubble({
         >
           <X size={14} />
         </button>
-        <span className="move-thought-title">
+        <span className="move-thought-copy">
           <img src={assetUrl(`assets/pieces/${icon}.svg`)} alt="" />
-          {title}
+          {text}
         </span>
-        <span>{text}</span>
       </div>
     </div>
   );

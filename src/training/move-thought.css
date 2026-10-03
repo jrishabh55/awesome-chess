@@ -59,12 +59,8 @@
   width: 6px;
   height: 5px;
 }
-.move-thought-title {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  margin-bottom: 3px;
-  font-weight: 700;
+.move-thought-copy {
+  display: block;
   padding-right: 23px;
 }
 .move-thought.plain,
@@ -96,9 +92,11 @@
   outline: 2px solid #526e36;
   outline-offset: 1px;
 }
-.move-thought-title img {
+.move-thought-copy img {
   width: clamp(16px, 8cqw, 23px);
   height: clamp(16px, 8cqw, 23px);
+  margin-right: 5px;
+  vertical-align: -5px;
 }
 @media (max-width: 560px) {
   .move-thought {
@@ -106,7 +104,7 @@
     padding: 7px 11px 9px;
     width: min(170px, calc(100% - 8px));
   }
-  .move-thought-title img {
+  .move-thought-copy img {
     width: 19px;
     height: 19px;
   }

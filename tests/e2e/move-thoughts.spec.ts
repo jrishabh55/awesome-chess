@@ -45,13 +45,15 @@ test('thought bubbles follow the played piece, flip with the board, and retain t
 }) => {
   await teacher(page);
   const thought = page.getByRole('status', { name: 'Move thought' });
-  await expect(thought).toContainText(/White.*e4/);
+  await expect(thought).toContainText(/From e4/);
+  await expect(thought.locator('img')).toHaveAttribute('src', /wP\.svg$/);
   await expect(thought).toContainText(/I.*d5/);
   await page.getByRole('button', { name: 'Next move', exact: true }).click();
   await expect(thought).toHaveAttribute('data-square', 'e4');
   await page.getByRole('button', { name: 'Next move', exact: true }).click();
   await expect(thought).toHaveAttribute('data-square', 'e5');
-  await expect(thought).toContainText(/Black.*e5/);
+  await expect(thought).toContainText(/From e5/);
+  await expect(thought.locator('img')).toHaveAttribute('src', /bP\.svg$/);
   const before = await thought.boundingBox();
   await page.keyboard.press('x');
   const after = await thought.boundingBox();
@@ -61,7 +63,8 @@ test('thought bubbles follow the played piece, flip with the board, and retain t
   await page.getByRole('button', { name: 'Next move', exact: true }).click();
   await expect(thought).toHaveAttribute('data-square', 'c6');
   await expect(page.getByText('Line complete', { exact: true })).toBeVisible();
-  await expect(thought).toContainText(/Black.*Nc6/);
+  await expect(thought).toContainText(/From c6/);
+  await expect(thought.locator('img')).toHaveAttribute('src', /bN\.svg$/);
   await page.getByRole('button', { name: 'Previous move', exact: true }).click();
   await expect(thought).toHaveAttribute('data-square', 'f3');
 });
