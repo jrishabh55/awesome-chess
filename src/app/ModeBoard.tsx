@@ -9,6 +9,7 @@ export function ModeBoard({
   bottom,
   caption,
   evaluation,
+  overlay,
   children,
 }: {
   board: ComponentProps<typeof Board>;
@@ -17,6 +18,7 @@ export function ModeBoard({
   bottom?: ReactNode;
   caption?: ReactNode;
   evaluation?: ReactNode;
+  overlay?: ReactNode;
   children?: ReactNode;
 }) {
   const player = (color: Color) => (
@@ -35,7 +37,7 @@ export function ModeBoard({
       {top ?? player(board.orientation === 'w' ? 'b' : 'w')}
       <div className="board-with-eval">
         {evaluation ?? <div className="board-eval-spacer" aria-hidden="true" />}
-        <Board {...board} />
+        <Board {...board} overlay={overlay} />
       </div>
       {bottom ?? player(board.orientation)}
       {tools}

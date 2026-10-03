@@ -34,6 +34,7 @@ import {
   pathTo,
 } from '../chess/tree';
 import { ModeBoard } from './ModeBoard';
+import { useMoveKeyPacing } from '../board/useMoveKeyPacing';
 import { BoardTools } from '../board/BoardTools';
 import { BoardNavigation } from '../board/BoardNavigation';
 import type { WorkspaceMode } from './WorkspaceApp';
@@ -363,6 +364,7 @@ export default function App({
     if (id) setStudy(selectNode(s, id));
     else setAutoplay(false);
   };
+  const allowMoveKey = useMoveKeyPacing(`${study.selectedId}:${demo?.index ?? ''}`);
   useEffect(() => {
     if (!autoplay) return;
     const timer = setInterval(() => step(1), 900);
@@ -394,6 +396,7 @@ export default function App({
       }
       if (retry) return;
       e.preventDefault();
+      if (!allowMoveKey(e)) return;
       setAutoplay(false);
       step(e.key === 'ArrowLeft' ? -1 : 1);
     };

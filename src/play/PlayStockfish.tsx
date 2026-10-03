@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { BoardTools } from '../board/BoardTools';
 import { BoardNavigation } from '../board/BoardNavigation';
+import { useMoveKeyPacing } from '../board/useMoveKeyPacing';
 import { ModeBoard } from '../app/ModeBoard';
 import { MoveList } from '../review/MoveList';
 import { chessAt, positionAt, createStudy } from '../chess/tree';
@@ -113,6 +114,7 @@ export function PlayStockfish({
     [game, session.viewPly, empty],
   );
   const displayNode = displayStudy.nodes[displayStudy.selectedId];
+  const allowMoveKey = useMoveKeyPacing(`${study.id}:${displayStudy.selectedId}`);
   const displayPly = session.viewPly ?? study.mainline.length;
   const viewingHistory = displayStudy.selectedId !== study.selectedId;
   const displayOutcome = useMemo(() => outcomeAt(displayStudy), [displayStudy]);
@@ -215,7 +217,8 @@ export function PlayStockfish({
       event.preventDefault();
       const latest = current.current;
       if (flip) commit({ ...latest, orientation: latest.orientation === 'w' ? 'b' : 'w' });
-      else commit(navigateHistory(latest, event.key === 'ArrowLeft' ? 'previous' : 'next'));
+      else if (allowMoveKey(event))
+        commit(navigateHistory(latest, event.key === 'ArrowLeft' ? 'previous' : 'next'));
     };
     window.addEventListener('keydown', keydown);
     return () => window.removeEventListener('keydown', keydown);

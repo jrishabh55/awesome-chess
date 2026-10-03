@@ -1,0 +1,73 @@
+.move-thought-layer {
+  position: absolute;
+  inset: 0;
+  container-type: size;
+  z-index: 6;
+  pointer-events: none;
+}
+.move-thought-anchor {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+.move-thought {
+  position: absolute;
+  width: min(220px, calc(100% - 8px));
+  padding: clamp(6px, 3cqw, 10px) clamp(8px, 4cqw, 15px) clamp(8px, 3cqw, 12px);
+  border: 2px solid #b9c89d;
+  border-radius: 27px;
+  background: #f8faef;
+  color: #293321;
+  box-shadow: 0 4px 16px #0003;
+  font-size: clamp(10px, 4cqw, 13px);
+  line-height: 1.4;
+}
+.move-thought::before,
+.move-thought::after {
+  content: '';
+  position: absolute;
+  width: 11px;
+  height: 9px;
+  border: 2px solid #b9c89d;
+  border-radius: 50%;
+  background: #f8faef;
+  left: var(--thought-tail);
+}
+.move-thought.above::before {
+  bottom: -13px;
+}
+.move-thought.above::after {
+  bottom: -25px;
+  width: 6px;
+  height: 5px;
+}
+.move-thought.below::before {
+  top: -13px;
+}
+.move-thought.below::after {
+  top: -25px;
+  width: 6px;
+  height: 5px;
+}
+.move-thought-title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 3px;
+  font-weight: 700;
+}
+.move-thought-title img {
+  width: clamp(16px, 8cqw, 23px);
+  height: clamp(16px, 8cqw, 23px);
+}
+@media (max-width: 560px) {
+  .move-thought {
+    font-size: 11px;
+    padding: 7px 11px 9px;
+    width: min(170px, calc(100% - 8px));
+  }
+  .move-thought-title img {
+    width: 19px;
+    height: 19px;
+  }
+}

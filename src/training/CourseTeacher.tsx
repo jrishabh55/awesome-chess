@@ -3,6 +3,8 @@ import { ArrowRight, BookOpen, Check, Layers3, RotateCcw, Trophy, X } from 'luci
 import { ModeBoard } from '../app/ModeBoard';
 import { BoardTools, type DrawingMode } from '../board/BoardTools';
 import { BoardNavigation } from '../board/BoardNavigation';
+import { useMoveKeyPacing } from '../board/useMoveKeyPacing';
+import { MoveThought } from './MoveThought';
 import type { Color, DrawingColor, Mark, Square } from '../chess/types';
 import { OpeningLibrary } from './OpeningLibrary';
 import { databasePack } from './database';
@@ -67,6 +69,7 @@ export function CourseTeacher({
   const opponentTurn = !!move && move.before.split(' ')[1] !== course.side;
   const previousMove = line.moves[session.ply - 1];
   const fen = previousMove?.after || line.rootFen;
+  const allowMoveKey = useMoveKeyPacing(fen);
   const guided = session.phase === 'guide';
   const plansVisible = session.phase === 'plans';
   const drilling = session.phase === 'drill';
@@ -208,6 +211,7 @@ export function CourseTeacher({
       }
       if (active && (guided || plansVisible) && ['ArrowLeft', 'ArrowRight'].includes(event.key)) {
         event.preventDefault();
+        if (!allowMoveKey(event)) return;
         navigate(event.key === 'ArrowLeft' ? -1 : 1);
       }
     };
@@ -238,6 +242,17 @@ export function CourseTeacher({
       </header>
       <div className="ot-workspace">
         <ModeBoard
+          overlay={
+            active &&
+            (guided || plansVisible) && (
+              <MoveThought
+                courseName={course.name}
+                line={line}
+                ply={session.ply}
+                orientation={orientation}
+              />
+            )
+          }
           board={{
             fen,
             orientation,

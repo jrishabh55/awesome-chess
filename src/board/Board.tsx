@@ -1,5 +1,13 @@
 import { assetUrl } from '../app/asset-url';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
 import { Chess } from 'chess.js';
 import type { Color, Square, Mark, DrawingColor } from '../chess/types';
 import { pointToSquare, squareToPoint } from './coordinates';
@@ -40,6 +48,7 @@ interface Props {
   hideHints?: boolean;
   isSideline?: boolean;
   outcome?: GameOutcome;
+  overlay?: ReactNode;
 }
 export function Board({
   fen,
@@ -57,6 +66,7 @@ export function Board({
   hideHints,
   isSideline = false,
   outcome,
+  overlay,
 }: Props) {
   const boardRef = useRef<HTMLDivElement>(null);
   const gesture = useRef<{
@@ -354,6 +364,7 @@ export function Board({
           )}
         </svg>
       </div>
+      {overlay}
       {promotion && (
         <div className="promotion-backdrop">
           <div className="promotion-dialog">

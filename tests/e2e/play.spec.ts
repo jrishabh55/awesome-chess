@@ -135,8 +135,13 @@ test('browses history during an engine reply and resumes without truncating the 
   });
   expect(saved.game.moves).toHaveLength(2);
   expect(saved.game.moves[0]).toBe('e2e4');
-  await page.keyboard.press('ArrowRight');
+  await page.keyboard.down('ArrowRight');
   await expect(page.locator('.play-position-caption')).toContainText('half-move 1 of 2');
+  for (let i = 0; i < 12; i++) await page.keyboard.down('ArrowRight');
+  await expect(page.locator('.play-position-caption')).toContainText('half-move 1 of 2', {
+    timeout: 2000,
+  });
+  await page.keyboard.up('ArrowRight');
   await page.getByRole('button', { name: 'Return to live game', exact: true }).click();
   await expect(page.locator('.play-position-caption')).toHaveText('Live game · 2 half-moves');
   await expect(page.getByText('Your move', { exact: true })).toBeVisible();

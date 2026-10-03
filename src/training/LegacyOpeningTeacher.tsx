@@ -3,6 +3,8 @@ import { ArrowRight, BookOpen, Check, ChevronRight, RotateCcw, X } from 'lucide-
 import { ModeBoard } from '../app/ModeBoard';
 import { BoardTools, type DrawingMode } from '../board/BoardTools';
 import { BoardNavigation } from '../board/BoardNavigation';
+import { useMoveKeyPacing } from '../board/useMoveKeyPacing';
+import { MoveThought } from './MoveThought';
 import { OpeningLibrary } from './OpeningLibrary';
 import type { OpeningCourse } from './courses';
 import type { Color, DrawingColor, Mark, Square } from '../chess/types';
@@ -74,6 +76,7 @@ export function LegacyOpeningTeacher({
     .slice(0, session.stage)
     .filter((s) => s.kind === 'final').length;
   const fen = position(pack, session);
+  const allowMoveKey = useMoveKeyPacing(fen);
   const annotationKey = fen.split(' ').slice(0, 4).join(' ');
   const flip = () => setOrientation((value) => (value === 'w' ? 'b' : 'w'));
   function navigate(delta: number) {
@@ -115,6 +118,7 @@ export function LegacyOpeningTeacher({
       }
       if (!active || !guided || !['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
       event.preventDefault();
+      if (!allowMoveKey(event)) return;
       navigate(event.key === 'ArrowLeft' ? -1 : 1);
     };
     window.addEventListener('keydown', keydown);
@@ -220,6 +224,17 @@ export function LegacyOpeningTeacher({
       </header>
       <div className="ot-workspace">
         <ModeBoard
+          overlay={
+            active &&
+            guided && (
+              <MoveThought
+                courseName={pack.name}
+                line={line}
+                ply={session.ply}
+                orientation={orientation}
+              />
+            )
+          }
           board={{
             fen,
             orientation,

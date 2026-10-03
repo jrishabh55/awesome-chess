@@ -30,6 +30,20 @@ const text = (explanation: { summary?: string; ideas: string[] }) =>
   [explanation.summary, ...explanation.ideas].join(' ');
 
 describe('position-aware opening explanations', () => {
+  it('lets either side’s piece explain its actual activity in a short thought', () => {
+    const opening = line('e4 e5 Nf3 Nc6');
+    expect(explainOpeningMove('Custom', opening, 0).thought).toMatch(/I.*d5/);
+    expect(explainOpeningMove('Custom', opening, 1).thought).toMatch(/I.*d4/);
+    expect(explainOpeningMove('Custom', opening, 2).thought).toMatch(/I.*pawn.*e5/);
+    expect(explainOpeningMove('Custom', opening, 3).thought).toMatch(/I.*pawn.*e5/);
+    const castle = line('e4 e5 Nf3 Nc6 Bc4 Nf6 O-O');
+    expect(explainOpeningMove('Custom', castle, 6).thought).toMatch(/I.*g1.*rook.*f1/);
+    const promotion = line('a8=N', '7k/P7/8/8/8/8/8/7K w - - 0 1');
+    expect(explainOpeningMove('Custom', promotion, 0).thought).toMatch(/I.*knight.*a8/);
+    const mate = line('f3 e5 g4 Qh4#');
+    expect(explainOpeningMove('Custom', mate, 3).thought).toMatch(/I.*checkmate/);
+  });
+
   it('explains London move order and actual pawn and knight support', () => {
     const london = line('d4 d5 Bf4 Nf6 e3 e6 Nd2');
     expect(text(explainOpeningMove('London System', london, 2))).toMatch(/before e3/);
