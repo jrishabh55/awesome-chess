@@ -4,7 +4,7 @@ for (const viewport of [
   { width: 1440, height: 900 },
   { width: 812, height: 375 },
 ]) {
-  test(`all modes keep the same board frame and accessible controls at ${viewport.width}×${viewport.height}`, async ({
+  test(`modes share board geometry without the lesson bar and keep controls accessible at ${viewport.width}×${viewport.height}`, async ({
     page,
   }) => {
     await page.setViewportSize(viewport);
@@ -34,8 +34,18 @@ for (const viewport of [
         ).toBeInViewport({ ratio: 1 });
       }
       const board = await page.locator('.chessboard').boundingBox();
-      for (const key of ['x', 'y', 'width', 'height'] as const)
-        expect(board![key]).toBeCloseTo(original![key], 0);
+      if (mode === 'Opening teacher') {
+        const thought = page.getByRole('status', { name: 'Move thought' });
+        await expect(thought).toBeInViewport({ ratio: 1 });
+        await expect(page.locator('.chessboard')).toBeInViewport({ ratio: 1 });
+        const bar = await thought.boundingBox();
+        expect(bar!.y + bar!.height).toBeLessThanOrEqual(board!.y - 4);
+        expect(board!.width).toBeGreaterThan(150);
+        expect(board!.width).toBeCloseTo(board!.height, 0);
+      } else {
+        for (const key of ['x', 'y', 'width', 'height'] as const)
+          expect(board![key]).toBeCloseTo(original![key], 0);
+      }
       await expect(menu.getByRole('button', { name: mode, exact: true })).toHaveAttribute(
         'aria-current',
         'page',
@@ -65,6 +75,15 @@ for (const viewport of [
       expect(overflow.width).toBeLessThanOrEqual(viewport.width);
       expect(overflow.height).toBeLessThanOrEqual(viewport.height);
       expect(overflow.scrollers).toEqual([]);
+      if (mode === 'Opening teacher') {
+        await page.getByRole('button', { name: 'Board settings', exact: true }).click();
+        await page.getByRole('checkbox', { name: 'Show thought bubbles', exact: true }).uncheck();
+        await page.getByRole('button', { name: 'Close opening dialog', exact: true }).click();
+        await expect(page.getByRole('status', { name: 'Move thought' })).toHaveCount(0);
+        const withoutBar = await page.locator('.chessboard').boundingBox();
+        for (const key of ['x', 'y', 'width', 'height'] as const)
+          expect(withoutBar![key]).toBeCloseTo(original![key], 0);
+      }
     }
   });
 }
