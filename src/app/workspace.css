@@ -114,6 +114,12 @@
   display: flex;
   flex-direction: column;
 }
+.workspace-app .board-header {
+  flex: none;
+  min-width: 0;
+  margin: 0 0 8px 22px;
+  container-type: inline-size;
+}
 .workspace-app .board-with-eval {
   flex: 1;
   min-width: 0;

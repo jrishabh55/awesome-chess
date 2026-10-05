@@ -39,9 +39,9 @@ export function OpeningSettings() {
           [
             'showThoughts',
             'Show thought bubbles',
-            'The × closes the current thought until your next move.',
+            'Show explanations above the board. The × closes the thought until your next move.',
           ],
-          ['glassEffect', 'Glass effect', 'Blur the board behind thought bubbles.'],
+          ['glassEffect', 'Glass effect', 'Give the explanation bar a frosted glass finish.'],
           [
             'highlightSquares',
             'Highlight explained squares',

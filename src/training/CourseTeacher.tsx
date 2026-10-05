@@ -257,15 +257,11 @@ export function CourseTeacher({
       </header>
       <div className="ot-workspace">
         <ModeBoard
-          overlay={
+          header={
             active &&
-            (guided || plansVisible) && (
-              <MoveThought
-                courseName={course.name}
-                line={line}
-                ply={session.ply}
-                orientation={orientation}
-              />
+            (guided || plansVisible) &&
+            preferences.showThoughts && (
+              <MoveThought courseName={course.name} line={line} ply={session.ply} />
             )
           }
           board={{

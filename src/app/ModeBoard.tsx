@@ -10,6 +10,7 @@ export function ModeBoard({
   caption,
   evaluation,
   overlay,
+  header,
   children,
 }: {
   board: ComponentProps<typeof Board>;
@@ -19,6 +20,7 @@ export function ModeBoard({
   caption?: ReactNode;
   evaluation?: ReactNode;
   overlay?: ReactNode;
+  header?: ReactNode;
   children?: ReactNode;
 }) {
   const player = (color: Color) => (
@@ -33,13 +35,20 @@ export function ModeBoard({
     </div>
   );
   return (
-    <section className="board-column shared-board-column" aria-label="Chess board workspace">
-      {top ?? player(board.orientation === 'w' ? 'b' : 'w')}
+    <section
+      className={`board-column shared-board-column${header ? ' has-board-header' : ''}`}
+      aria-label="Chess board workspace"
+    >
+      {header ? (
+        <div className="board-header">{header}</div>
+      ) : (
+        (top ?? player(board.orientation === 'w' ? 'b' : 'w'))
+      )}
       <div className="board-with-eval">
         {evaluation ?? <div className="board-eval-spacer" aria-hidden="true" />}
         <Board {...board} overlay={overlay} />
       </div>
-      {bottom ?? player(board.orientation)}
+      {!header && (bottom ?? player(board.orientation))}
       {tools}
       <div className="board-caption">
         <span>Right-click / drag: red · Ctrl: orange · Shift: green</span>

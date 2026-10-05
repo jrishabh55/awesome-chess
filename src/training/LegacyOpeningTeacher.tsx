@@ -234,15 +234,11 @@ export function LegacyOpeningTeacher({
       </header>
       <div className="ot-workspace">
         <ModeBoard
-          overlay={
+          header={
             active &&
-            guided && (
-              <MoveThought
-                courseName={pack.name}
-                line={line}
-                ply={session.ply}
-                orientation={orientation}
-              />
+            guided &&
+            preferences.showThoughts && (
+              <MoveThought courseName={pack.name} line={line} ply={session.ply} />
             )
           }
           board={{

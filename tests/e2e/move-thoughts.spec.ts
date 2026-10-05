@@ -40,11 +40,14 @@ async function teacher(page: Page, phase = 'guide') {
   await page.getByRole('button', { name: 'Resume course', exact: true }).click();
 }
 
-test('thought bubbles follow the played piece, flip with the board, and retain the final move', async ({
+test('thought bar stays above the board when flipping and retains the final move', async ({
   page,
 }) => {
   await teacher(page);
   const thought = page.getByRole('status', { name: 'Move thought' });
+  const initial = await thought.boundingBox();
+  const board = await page.getByRole('grid', { name: 'Chessboard', exact: true }).boundingBox();
+  expect(initial!.y + initial!.height).toBeLessThanOrEqual(board!.y - 4);
   await expect(thought).toContainText(/From e4/);
   await expect(thought.locator('img')).toHaveAttribute('src', /wP\.svg$/);
   await expect(thought).toContainText(/I.*d5/);
@@ -57,7 +60,7 @@ test('thought bubbles follow the played piece, flip with the board, and retain t
   const before = await thought.boundingBox();
   await page.keyboard.press('x');
   const after = await thought.boundingBox();
-  expect(Math.abs(after!.y - before!.y)).toBeGreaterThan(30);
+  expect(Math.abs(after!.y - before!.y)).toBeLessThan(1);
   await page.getByRole('button', { name: 'Next move', exact: true }).click();
   await expect(thought).toHaveAttribute('data-square', 'f3');
   await page.getByRole('button', { name: 'Next move', exact: true }).click();
@@ -223,7 +226,7 @@ test('bubble squares use the existing highlight design and follow each explanati
   await expect(mark(3, 4, '#f65c54')).toHaveCount(0);
 });
 
-test('mobile thoughts stay inside the board and do not intercept piece input', async ({ page }) => {
+test('thought bar stays above the clear board on mobile and desktop', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await teacher(page);
   const thought = page.getByRole('status', { name: 'Move thought' });
@@ -244,16 +247,11 @@ test('mobile thoughts stay inside the board and do not intercept piece input', a
     await page.keyboard.press('x');
     const bubble = await thought.boundingBox();
     const board = await page.getByRole('grid', { name: 'Chessboard', exact: true }).boundingBox();
-    expect(bubble!.x).toBeGreaterThanOrEqual(board!.x);
-    expect(bubble!.x + bubble!.width).toBeLessThanOrEqual(board!.x + board!.width);
-    expect(bubble!.y).toBeGreaterThanOrEqual(board!.y);
-    expect(bubble!.y + bubble!.height).toBeLessThanOrEqual(board!.y + board!.height);
-    const anchor = await page.locator('.move-thought-anchor').boundingBox();
-    const pieceSquare = await page
-      .getByRole('gridcell', { name: 'e5 black pawn', exact: true })
-      .boundingBox();
-    expect(Math.abs(anchor!.x - pieceSquare!.x - pieceSquare!.width / 2)).toBeLessThan(1);
-    expect(Math.abs(anchor!.y - pieceSquare!.y - pieceSquare!.height / 2)).toBeLessThan(1);
+    expect(bubble!.x).toBeGreaterThanOrEqual(0);
+    expect(bubble!.x + bubble!.width).toBeLessThanOrEqual(width);
+    expect(bubble!.y).toBeGreaterThanOrEqual(0);
+    expect(bubble!.y + bubble!.height).toBeLessThanOrEqual(board!.y - 4);
+    expect(board!.width).toBeGreaterThan(140);
   }
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.evaluate(async () => {
