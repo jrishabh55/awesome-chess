@@ -1,48 +1,12 @@
 import type { Color, Mark, Study } from '../chess/types';
 import { chessAt, createStudy, playMove, positionAt, toggleMark } from '../chess/tree';
 import type { Strength } from './engine';
-import { Chess } from 'chess.js';
-
-export interface PlayOpening {
-  name: string;
-  eco: string;
-  pgn: string;
-}
-function readOpening(value: unknown): PlayOpening | undefined {
-  if (!value || typeof value !== 'object') return;
-  const entry = value as PlayOpening;
-  if (
-    typeof entry.name !== 'string' ||
-    !entry.name.trim() ||
-    entry.name.length > 300 ||
-    !/^[A-E]\d{2}$/.test(entry.eco) ||
-    typeof entry.pgn !== 'string' ||
-    entry.pgn.length > 8000
-  )
-    return;
-  try {
-    const chess = new Chess();
-    chess.loadPgn(entry.pgn);
-    if (chess.getHeaders().FEN || !chess.history().length || chess.history().length > 200) return;
-    return { name: entry.name, eco: entry.eco, pgn: entry.pgn };
-  } catch {
-    return;
-  }
-}
-export function openingMoves(opening: PlayOpening): string[] {
-  const chess = new Chess();
-  chess.loadPgn(opening.pgn);
-  return chess
-    .history({ verbose: true })
-    .map((move) => move.from + move.to + (move.promotion || ''));
-}
+import { openingPractice, readOpening, type PlayOpening } from './openings';
+export { openingMoves, type PlayOpening } from './openings';
 export function nextOpeningMove(game: PlayGame): string | null {
-  if (!game.opening || game.study.headers.Result !== '*') return null;
-  const line = openingMoves(game.opening);
-  const played = positionAt(game.study, game.study.selectedId).moves;
-  return played.length < line.length && played.every((move, i) => move === line[i])
-    ? line[played.length]
-    : null;
+  if (game.study.headers.Result !== '*') return null;
+  const practice = openingPractice(game);
+  return practice.kind === 'following' ? practice.nextMove : null;
 }
 
 // Stockfish documents Elo 1320–3190 and Skill Level 0–20. Its calibration
@@ -85,6 +49,7 @@ export interface PlaySettings {
   side: Color | 'random';
   strengthId: string;
   opening?: PlayOpening;
+  followOpeningVariations?: boolean;
 }
 export interface PlayGame {
   study: Study;
@@ -92,6 +57,7 @@ export interface PlayGame {
   strengthId: string;
   startedAt: number;
   opening?: PlayOpening;
+  followOpeningVariations: boolean;
 }
 export interface PlaySession {
   game: PlayGame | null;
@@ -100,7 +66,11 @@ export interface PlaySession {
   /** Null follows the live game; a ply number pins an already played position. */
   viewPly?: number | null;
 }
-export const defaultSettings: PlaySettings = { side: 'w', strengthId: 'skill-0' };
+export const defaultSettings: PlaySettings = {
+  side: 'w',
+  strengthId: 'skill-0',
+  followOpeningVariations: true,
+};
 export const strengthFor = (id: string) => strengths.find((s) => s.id === id) || strengths[0];
 
 export function createGame(settings: PlaySettings): PlayGame {
@@ -108,7 +78,12 @@ export function createGame(settings: PlaySettings): PlayGame {
   const strength = strengthFor(settings.strengthId);
   const study = createStudy();
   const startedAt = Date.now();
-  const opening = readOpening(settings.opening);
+  const followOpeningVariations = settings.followOpeningVariations !== false;
+  const selected = readOpening(settings.opening);
+  const opening =
+    selected && !followOpeningVariations
+      ? { name: selected.name, eco: selected.eco, pgn: selected.pgn }
+      : selected;
   study.headers = {
     Event: 'Casual game vs Stockfish',
     Site: 'Chess Room',
@@ -118,7 +93,23 @@ export function createGame(settings: PlaySettings): PlayGame {
     Result: '*',
     ...(opening ? { Opening: opening.name, ECO: opening.eco } : {}),
   };
-  return { study, humanColor, strengthId: strength.id, startedAt, ...(opening ? { opening } : {}) };
+  return {
+    study,
+    humanColor,
+    strengthId: strength.id,
+    startedAt,
+    followOpeningVariations,
+    ...(opening ? { opening } : {}),
+  };
+}
+
+export function replayOpening(game: PlayGame): PlayGame {
+  return createGame({
+    side: game.humanColor,
+    strengthId: game.strengthId,
+    opening: game.opening,
+    followOpeningVariations: game.followOpeningVariations,
+  });
 }
 
 export function changeGameStrength(game: PlayGame, strengthId: string): PlayGame {
@@ -247,6 +238,7 @@ export function serializeSession(session: PlaySession): string {
           strengthId: game.strengthId,
           startedAt: game.startedAt,
           opening: game.opening,
+          followOpeningVariations: game.followOpeningVariations,
           moves: positionAt(game.study, game.study.selectedId).moves,
           resigned: game.study.headers.Termination === 'Resignation',
           marks: [game.study.rootId, ...game.study.mainline].map(
@@ -287,6 +279,7 @@ export function restoreSession(raw: string | null): PlaySession | null {
         side: g.humanColor,
         strengthId: g.strengthId,
         opening: readOpening(g.opening),
+        followOpeningVariations: g.followOpeningVariations === true,
       });
       game.study.id = g.id;
       game.startedAt = g.startedAt;
@@ -317,6 +310,7 @@ export function restoreSession(raw: string | null): PlaySession | null {
       settings: {
         side: saved.settings.side,
         strengthId: saved.settings.strengthId,
+        followOpeningVariations: saved.settings.followOpeningVariations !== false,
         ...(readOpening(saved.settings.opening)
           ? { opening: readOpening(saved.settings.opening) }
           : {}),

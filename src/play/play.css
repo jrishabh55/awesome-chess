@@ -34,6 +34,27 @@
   text-decoration: underline;
   padding: 3px 0;
 }
+.play-opening-replay {
+  margin-left: 7px;
+  color: #b6d68c;
+  font-size: inherit;
+  text-decoration: underline;
+}
+.play-opening-follow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 12px;
+}
+.play-opening-follow input {
+  accent-color: #b6d68c;
+  width: 16px;
+  height: 16px;
+}
+.play-opening-follow:has(input:disabled) {
+  color: #aeb3a6;
+}
 .play-header h1 {
   display: flex;
   align-items: center;

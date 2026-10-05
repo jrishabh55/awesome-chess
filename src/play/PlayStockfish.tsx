@@ -11,6 +11,7 @@ import {
   User,
   X,
   Settings,
+  AlertTriangle,
 } from 'lucide-react';
 import { BoardTools } from '../board/BoardTools';
 import { BoardNavigation } from '../board/BoardNavigation';
@@ -36,6 +37,7 @@ import {
   defaultSettings,
   navigateHistory,
   resignGame,
+  replayOpening,
   restoreSession,
   serializeSession,
   snapshotForReview,
@@ -45,6 +47,7 @@ import {
   type PlaySession,
   type PlaySettings,
 } from './game';
+import { compileOpening, openingPractice } from './openings';
 import './play.css';
 
 const storageKey = `chess-room-play-v1:${import.meta.env.BASE_URL}`;
@@ -144,6 +147,20 @@ export function PlayStockfish({
   const ended = Boolean(outcome);
   const human = game?.humanColor || 'w';
   const selectedStrength = strengthFor(game?.strengthId || session.settings.strengthId);
+  const practice = useMemo(() => (game ? openingPractice(game) : { kind: 'off' as const }), [game]);
+  const departure = useMemo(() => {
+    if (!game || practice.kind !== 'diverged') return null;
+    const node = study.nodes[study.mainline[practice.departurePly - 1]];
+    if (!node?.parentId || !node.uci) return null;
+    const before = new Chess(study.nodes[node.parentId].fen);
+    const piece = before.get(node.uci.slice(0, 2) as Square)!;
+    const move = before.move({
+      from: node.uci.slice(0, 2),
+      to: node.uci.slice(2, 4),
+      promotion: node.uci[4],
+    });
+    return { piece, move, ply: practice.departurePly };
+  }, [game, practice, study]);
   const openingMove = game && !viewingHistory ? nextOpeningMove(game) : null;
   const hintedMove = useMemo(() => {
     if (!openingHint || !openingMove) return null;
@@ -325,11 +342,25 @@ export function PlayStockfish({
   };
   const start = () => {
     engine.current?.dispose();
-    const next = createGame(draft);
+    const opening =
+      draft.opening && draft.followOpeningVariations !== false
+        ? compileOpening(draft.opening, catalog)
+        : draft.opening;
+    const next = createGame({ ...draft, opening });
     commit({ game: next, settings: draft, orientation: next.humanColor, viewPly: null });
     setDrawingMode('move');
     setReady(false);
     setSetup(false);
+  };
+  const replay = () => {
+    const latest = current.current;
+    if (!latest.game?.opening) return;
+    engine.current?.dispose();
+    const next = replayOpening(latest.game);
+    commit({ ...latest, game: next, viewPly: null });
+    setOpeningHint(false);
+    setDrawingMode('move');
+    setReady(false);
   };
   const applySettings = () => {
     const latest = current.current;
@@ -417,18 +448,34 @@ export function PlayStockfish({
         <ModeBoard
           key={study.id}
           header={
-            hintedMove &&
-            game?.opening && (
+            departure && !viewingHistory ? (
               <MoveBanner
-                positionKey={`${study.id}:${study.selectedId}:hint`}
-                square={hintedMove.move.from}
-                piece={hintedMove.piece}
-                from={hintedMove.move.from}
-                to={hintedMove.move.to}
-                capture={Boolean(hintedMove.move.captured)}
-                text={`In this opening, play ${hintedMove.move.san}.`}
-                label="Opening hint"
+                positionKey={`${study.id}:opening-departure:${departure.ply}`}
+                square={departure.move.to}
+                piece={departure.piece}
+                from={departure.move.from}
+                to={departure.move.to}
+                capture={Boolean(departure.move.captured)}
+                text="You left this opening."
+                label="Opening left"
+                labelIcon={<AlertTriangle size={15} />}
+                labelColor="#b85c0b"
+                action={{ label: 'Replay opening', onClick: replay }}
               />
+            ) : (
+              hintedMove &&
+              game?.opening && (
+                <MoveBanner
+                  positionKey={`${study.id}:${study.selectedId}:hint`}
+                  square={hintedMove.move.from}
+                  piece={hintedMove.piece}
+                  from={hintedMove.move.from}
+                  to={hintedMove.move.to}
+                  capture={Boolean(hintedMove.move.captured)}
+                  text={`In this opening, play ${hintedMove.move.san}.`}
+                  label="Opening hint"
+                />
+              )
             )
           }
           board={{
@@ -495,8 +542,20 @@ export function PlayStockfish({
             <p>{subtitle}</p>
             {game?.opening && (
               <p className="play-opening-status">
-                <strong title={game.opening.name}>{game.opening.name}</strong> ·{' '}
-                {nextOpeningMove(game) ? 'Opening practice' : 'Free play'}
+                <strong title={practice.kind === 'off' ? game.opening.name : practice.name}>
+                  {practice.kind === 'off' ? game.opening.name : practice.name}
+                </strong>{' '}
+                ·{' '}
+                {practice.kind === 'following'
+                  ? 'Opening practice'
+                  : practice.kind === 'diverged'
+                    ? 'Opening left · Free play'
+                    : 'Opening complete · Free play'}
+                {practice.kind === 'diverged' && (
+                  <button className="play-opening-replay" onClick={replay}>
+                    Replay opening
+                  </button>
+                )}
               </p>
             )}
             {openingMove && chess.turn() === human && (
@@ -646,9 +705,24 @@ export function PlayStockfish({
                   })
                 }
               />
+              <label className="play-opening-follow">
+                <input
+                  type="checkbox"
+                  checked={draft.followOpeningVariations !== false}
+                  disabled={!draft.opening}
+                  onChange={(event) =>
+                    setDraft({ ...draft, followOpeningVariations: event.target.checked })
+                  }
+                />
+                Follow opening variations
+              </label>
+              <p className="play-rating-note">
+                Follow your chosen branch to its longest available continuation. Turn off to
+                practice only the selected line.
+              </p>
               <p className="play-rating-note">
                 {draft.opening
-                  ? `${draft.opening.pgn} · Stockfish follows this line while your moves match it, then plays freely.`
+                  ? `${draft.opening.pgn} · Stockfish follows matching opening moves, then plays freely. If you leave the opening early, a banner offers to replay it.`
                   : 'Leave this empty for a regular game. In opening practice you play your own moves from the starting position.'}
               </p>
               {catalogError && (
