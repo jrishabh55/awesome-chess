@@ -7,6 +7,7 @@ import {
   Download,
   Upload,
   Settings2,
+  Settings,
   RotateCcw,
   ArrowUpRight,
   Pause,
@@ -47,11 +48,13 @@ import { EngineClient, positionKey } from '../engine/worker-client';
 import type { AnalysisResult, EngineFlavor } from '../engine/types';
 import { scoreText } from '../engine/uci';
 import { assessMove, sanLine } from '../review/classify';
-import type { MoveAssessment, Evidence } from '../review/policy';
+import { isError, type MoveAssessment, type Evidence } from '../review/policy';
 import { MoveList } from '../review/MoveList';
 import { AnalysisPanel } from '../review/AnalysisPanel';
 import { ReviewPanel, ReviewReport } from '../review/ReviewPanel';
 import { CoachCard } from '../coach/CoachCard';
+import { ReviewMoveBanner } from '../coach/ReviewMoveBanner';
+import { useOpeningPreferences } from '../training/preferences';
 import { OpeningSettings } from '../training/OpeningSettings';
 import { keyMoments } from '../coach/explain';
 import { startRetry, submitRetry, type RetrySession } from '../retry/session';
@@ -101,6 +104,7 @@ export default function App({
   initialStudy?: Study;
   navigationRef?: MutableRefObject<((next: WorkspaceMode) => Promise<void>) | null>;
 } = {}) {
+  const boardPreferences = useOpeningPreferences();
   const [study, setStudy] = useState<Study>(() => {
     if (initialStudy) return initialStudy;
     const s = parsePgn(samplePgn)[0];
@@ -119,7 +123,7 @@ export default function App({
   const [tab, setTab] = useState<'review' | 'analysis' | 'openings'>('review'),
     [orientation, setOrientation] = useState<Color>('w'),
     [mode, setMode] = useState<'move' | 'arrow' | 'square'>('move'),
-    [drawingColor, setDrawingColor] = useState<DrawingColor>('red');
+    [drawingColor, setDrawingColor] = useState<DrawingColor>('green');
   const [flavor, setFlavor] = useState<EngineFlavor>('full'),
     [depth, setDepth] = useState(12),
     [infinite, setInfinite] = useState(false),
@@ -150,6 +154,8 @@ export default function App({
     [retryBusy, setRetryBusy] = useState(false),
     [retryAccepted, setRetryAccepted] = useState<boolean | null>(null),
     [autoplay, setAutoplay] = useState(false);
+  const [guidedReview, setGuidedReview] = useState(false);
+  const resumedMoment = useRef<string | null>(null);
   const [offlineReady, setOfflineReady] = useState(false),
     [downloadProgress, setDownloadProgress] = useState<number | null>(null),
     [downloadSize, setDownloadSize] = useState(0),
@@ -292,7 +298,7 @@ export default function App({
           {
             id: `interactive:${s.id}:${node}`,
             position: positionAt(s, node),
-            budget: infinite ? { kind: 'infinite' } : { kind: 'depth', depth },
+            budget: infinite && !guidedReview ? { kind: 'infinite' } : { kind: 'depth', depth },
             multiPv: 3,
           },
           abort.signal,
@@ -334,6 +340,7 @@ export default function App({
     openingReady,
     engineOn,
     infinite,
+    guidedReview,
     retry !== null,
     demo !== null,
     reviewing,
@@ -345,6 +352,7 @@ export default function App({
   }, [toast]);
   const navigate = (id: string) => {
     setAutoplay(false);
+    setGuidedReview(false);
     setDemo(null);
     retryAbort.current?.abort();
     setRetry(null);
@@ -367,10 +375,42 @@ export default function App({
   };
   const allowMoveKey = useMoveKeyPacing(`${study.selectedId}:${demo?.index ?? ''}`);
   useEffect(() => {
-    if (!autoplay) return;
-    const timer = setInterval(() => step(1), 900);
-    return () => clearInterval(timer);
-  }, [autoplay, demo]);
+    if (!autoplay || modal || retry || reviewing) return;
+    if (guidedReview && !demo && study.selectedId !== study.rootId) {
+      const assessment = assessments[study.selectedId];
+      if (!assessment) {
+        if (!engineOn || engineStatus === 'Unavailable') setAutoplay(false);
+        return;
+      }
+      const watched = reviewAs === 'both' || assessment.mover === reviewAs;
+      if (
+        watched &&
+        (isError(assessment.primary) || ['Brilliant', 'Great'].includes(assessment.primary)) &&
+        resumedMoment.current !== study.selectedId
+      ) {
+        setAutoplay(false);
+        return;
+      }
+    }
+    const timer = setTimeout(() => step(1), guidedReview ? 1800 : 900);
+    return () => clearTimeout(timer);
+  }, [
+    autoplay,
+    demo,
+    study.selectedId,
+    guidedReview,
+    assessments,
+    modal,
+    retry,
+    reviewing,
+    engineOn,
+    engineStatus,
+    reviewAs,
+  ]);
+  const continueGuidedReview = () => {
+    resumedMoment.current = study.selectedId;
+    setAutoplay(true);
+  };
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const flip = e.key.toLowerCase() === 'x';
@@ -413,6 +453,8 @@ export default function App({
     setRetry(null);
     setAutoplay(false);
     setStudy(s);
+    setGuidedReview(false);
+    resumedMoment.current = null;
     setModal(null);
     setError('');
     setInput('');
@@ -953,6 +995,14 @@ export default function App({
           </div>
           <div className="header-actions">
             <button
+              className="review-settings-icon"
+              title="Review settings"
+              aria-label="Review settings"
+              onClick={() => openSettings()}
+            >
+              <Settings size={19} />
+            </button>
+            <button
               className="import-button"
               onClick={() => {
                 setModal('import');
@@ -1002,6 +1052,38 @@ export default function App({
         )}
         <div className="workspace">
           <ModeBoard
+            header={
+              !retry &&
+              !demo &&
+              showCoach &&
+              boardPreferences.showThoughts &&
+              study.nodes[study.selectedId].uci && (
+                <ReviewMoveBanner
+                  study={study}
+                  assessment={selectedAssessment}
+                  message={
+                    guidedReview && !selectedAssessment
+                      ? autoplay
+                        ? 'Analyzing this move…'
+                        : 'This move has not been analyzed yet.'
+                      : undefined
+                  }
+                  action={
+                    guidedReview && !autoplay && study.nodes[study.selectedId].children.length
+                      ? {
+                          label: selectedAssessment ? 'Continue review' : 'Analyze game',
+                          onClick: selectedAssessment
+                            ? continueGuidedReview
+                            : () => {
+                                setAutoplay(true);
+                                void runReview();
+                              },
+                        }
+                      : undefined
+                  }
+                />
+              )
+            }
             top={player(top)}
             bottom={player(bottom)}
             evaluation={
@@ -1218,10 +1300,12 @@ export default function App({
                   }}
                   onSelect={navigate}
                   onGuide={() => {
+                    setInfinite(false);
                     setShowCoach(true);
-                    openSettings('coach');
-                    const id = keyMoments(study, assessments, reviewAs)[0];
-                    if (id) navigate(id);
+                    navigate(study.rootId);
+                    resumedMoment.current = null;
+                    setGuidedReview(true);
+                    setAutoplay(true);
                   }}
                 />
               ) : tab === 'openings' ? (
@@ -1283,7 +1367,10 @@ export default function App({
               <button
                 aria-label={autoplay ? 'Pause playback' : 'Play moves'}
                 className="play-button"
-                onClick={() => setAutoplay((v) => !v)}
+                onClick={() => {
+                  if (guidedReview && !autoplay) continueGuidedReview();
+                  else setAutoplay((v) => !v);
+                }}
                 disabled={Boolean(retry)}
               >
                 {autoplay ? <Pause size={21} /> : <Play size={21} fill="currentColor" />}
@@ -1628,8 +1715,8 @@ export default function App({
                       {study.headers.Result || '*'}
                     </p>
                     <p>
-                      Right-click / drag: red · Ctrl: orange · Shift: green. Press X to flip; Left /
-                      Right navigate moves.
+                      Right-click / drag: selected color (green by default) · Ctrl: orange · Shift:
+                      green. Press X to flip; Left / Right navigate moves.
                     </p>{' '}
                     <div className="settings-tools-actions">
                       <button onClick={() => saveFile('chess-room.pgn', exportPgn(study))}>

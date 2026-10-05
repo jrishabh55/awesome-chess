@@ -120,6 +120,13 @@
   margin: 0 0 8px 22px;
   container-type: inline-size;
 }
+.review-settings-icon {
+  display: grid;
+  place-items: center;
+  padding: 7px;
+  border: 1px solid #454c3d;
+  border-radius: 7px;
+}
 .workspace-app .board-with-eval {
   flex: 1;
   min-width: 0;

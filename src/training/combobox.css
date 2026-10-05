@@ -157,3 +157,10 @@
     font-size: 12px;
   }
 }
+.oc-opening-moves {
+  display: block;
+  color: #adb69e;
+  font-size: 10px;
+  margin-top: 3px;
+  overflow-wrap: anywhere;
+}

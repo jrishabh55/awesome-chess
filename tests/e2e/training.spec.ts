@@ -30,7 +30,7 @@ test('opening teacher guides, validates drills, and resumes locally', async ({ p
   await openTeacher(page);
   await startShortCourse(page);
   await expect(page.getByRole('heading', { name: 'White plays e4' })).toBeVisible();
-  await expect(page.locator('.board-overlay')).toBeVisible();
+  await expect(page.locator('.board-arrow-layer')).toBeVisible();
   await expect(page.locator('.board-overlay > path')).toHaveCount(1);
   await page.getByRole('button', { name: 'Next move', exact: true }).click();
   await page.getByRole('button', { name: 'Previous move', exact: true }).click();

@@ -12,8 +12,37 @@ import {
   serializeSession,
   snapshotForReview,
   viewedStudy,
+  nextOpeningMove,
   type PlaySession,
 } from './game';
+
+const scandinavian = { name: 'Scandinavian Defense', eco: 'B01', pgn: '1. e4 d5 2. exd5 Qxd5' };
+it('follows a selected opening only while the live game matches its complete prefix', () => {
+  let game = createGame({ ...defaultSettings, opening: scandinavian });
+  expect(nextOpeningMove(game)).toBe('e2e4');
+  game = advanceGame(game, 'e2e4');
+  expect(nextOpeningMove(game)).toBe('d7d5');
+  game = advanceGame(game, 'd7d5');
+  const deviated = advanceGame(game, 'e4e5');
+  expect(nextOpeningMove(deviated)).toBeNull();
+  game = advanceGame(game, 'e4d5');
+  expect(nextOpeningMove(game)).toBe('d8d5');
+  game = advanceGame(game, 'd8d5');
+  expect(nextOpeningMove(game)).toBeNull();
+  expect(game.study.headers.Opening).toBe(scandinavian.name);
+});
+it('restores opening practice and resumes the remaining scripted reply without trusting saved moves', () => {
+  const settings = { ...defaultSettings, opening: scandinavian };
+  const game = advanceGame(createGame(settings), 'e2e4');
+  const raw = serializeSession({ game, settings, orientation: 'w', viewPly: 0 });
+  const restored = restoreSession(raw)!;
+  expect(nextOpeningMove(restored.game!)).toBe('d7d5');
+  expect(restored.settings.opening).toEqual(scandinavian);
+  expect(restored.viewPly).toBe(0);
+  const tampered = JSON.parse(raw);
+  tampered.game.opening.pgn = '1. e5';
+  expect(restoreSession(JSON.stringify(tampered))!.game!.opening).toBeUndefined();
+});
 
 it('builds a proper review mainline and marks checkmate', () => {
   let game = createGame({ side: 'w', strengthId: 'skill-0' });

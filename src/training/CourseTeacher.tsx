@@ -56,7 +56,7 @@ export function CourseTeacher({
   const [active, setActive] = useState(initialActive);
   const [orientation, setOrientation] = useState<Color>(course.side);
   const [drawingMode, setDrawingMode] = useState<DrawingMode>('move');
-  const [drawingColor, setDrawingColor] = useState<DrawingColor>('red');
+  const [drawingColor, setDrawingColor] = useState<DrawingColor>('green');
   const [annotations, setAnnotations] = useState<Record<string, Mark[]>>({});
   const [hint, setHint] = useState(false);
   const [notice, setNotice] = useState('');

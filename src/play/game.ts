@@ -1,6 +1,49 @@
 import type { Color, Mark, Study } from '../chess/types';
 import { chessAt, createStudy, playMove, positionAt, toggleMark } from '../chess/tree';
 import type { Strength } from './engine';
+import { Chess } from 'chess.js';
+
+export interface PlayOpening {
+  name: string;
+  eco: string;
+  pgn: string;
+}
+function readOpening(value: unknown): PlayOpening | undefined {
+  if (!value || typeof value !== 'object') return;
+  const entry = value as PlayOpening;
+  if (
+    typeof entry.name !== 'string' ||
+    !entry.name.trim() ||
+    entry.name.length > 300 ||
+    !/^[A-E]\d{2}$/.test(entry.eco) ||
+    typeof entry.pgn !== 'string' ||
+    entry.pgn.length > 8000
+  )
+    return;
+  try {
+    const chess = new Chess();
+    chess.loadPgn(entry.pgn);
+    if (chess.getHeaders().FEN || !chess.history().length || chess.history().length > 200) return;
+    return { name: entry.name, eco: entry.eco, pgn: entry.pgn };
+  } catch {
+    return;
+  }
+}
+export function openingMoves(opening: PlayOpening): string[] {
+  const chess = new Chess();
+  chess.loadPgn(opening.pgn);
+  return chess
+    .history({ verbose: true })
+    .map((move) => move.from + move.to + (move.promotion || ''));
+}
+export function nextOpeningMove(game: PlayGame): string | null {
+  if (!game.opening || game.study.headers.Result !== '*') return null;
+  const line = openingMoves(game.opening);
+  const played = positionAt(game.study, game.study.selectedId).moves;
+  return played.length < line.length && played.every((move, i) => move === line[i])
+    ? line[played.length]
+    : null;
+}
 
 // Stockfish documents Elo 1320–3190 and Skill Level 0–20. Its calibration
 // uses 120s+1s; these short, lite-engine games are approximate targets only.
@@ -41,12 +84,14 @@ export const strengths: { id: string; label: string; detail: string; value: Stre
 export interface PlaySettings {
   side: Color | 'random';
   strengthId: string;
+  opening?: PlayOpening;
 }
 export interface PlayGame {
   study: Study;
   humanColor: Color;
   strengthId: string;
   startedAt: number;
+  opening?: PlayOpening;
 }
 export interface PlaySession {
   game: PlayGame | null;
@@ -63,6 +108,7 @@ export function createGame(settings: PlaySettings): PlayGame {
   const strength = strengthFor(settings.strengthId);
   const study = createStudy();
   const startedAt = Date.now();
+  const opening = readOpening(settings.opening);
   study.headers = {
     Event: 'Casual game vs Stockfish',
     Site: 'Chess Room',
@@ -70,8 +116,26 @@ export function createGame(settings: PlaySettings): PlayGame {
     White: humanColor === 'w' ? 'You' : `Stockfish 19 · ${strength.label}`,
     Black: humanColor === 'b' ? 'You' : `Stockfish 19 · ${strength.label}`,
     Result: '*',
+    ...(opening ? { Opening: opening.name, ECO: opening.eco } : {}),
   };
-  return { study, humanColor, strengthId: strength.id, startedAt };
+  return { study, humanColor, strengthId: strength.id, startedAt, ...(opening ? { opening } : {}) };
+}
+
+export function changeGameStrength(game: PlayGame, strengthId: string): PlayGame {
+  const strength = strengthFor(strengthId);
+  return {
+    ...game,
+    strengthId: strength.id,
+    study: {
+      ...game.study,
+      revision: game.study.revision + 1,
+      updatedAt: Date.now(),
+      headers: {
+        ...game.study.headers,
+        [game.humanColor === 'w' ? 'Black' : 'White']: `Stockfish 19 · ${strength.label}`,
+      },
+    },
+  };
 }
 
 export function advanceGame(game: PlayGame, move: string): PlayGame {
@@ -182,6 +246,7 @@ export function serializeSession(session: PlaySession): string {
           humanColor: game.humanColor,
           strengthId: game.strengthId,
           startedAt: game.startedAt,
+          opening: game.opening,
           moves: positionAt(game.study, game.study.selectedId).moves,
           resigned: game.study.headers.Termination === 'Resignation',
           marks: [game.study.rootId, ...game.study.mainline].map(
@@ -218,7 +283,11 @@ export function restoreSession(raw: string | null): PlaySession | null {
         typeof g.resigned !== 'boolean'
       )
         return null;
-      game = createGame({ side: g.humanColor, strengthId: g.strengthId });
+      game = createGame({
+        side: g.humanColor,
+        strengthId: g.strengthId,
+        opening: readOpening(g.opening),
+      });
       game.study.id = g.id;
       game.startedAt = g.startedAt;
       game.study.headers.Date = new Date(g.startedAt)
@@ -245,7 +314,13 @@ export function restoreSession(raw: string | null): PlaySession | null {
     }
     return {
       game,
-      settings: { side: saved.settings.side, strengthId: saved.settings.strengthId },
+      settings: {
+        side: saved.settings.side,
+        strengthId: saved.settings.strengthId,
+        ...(readOpening(saved.settings.opening)
+          ? { opening: readOpening(saved.settings.opening) }
+          : {}),
+      },
       orientation: saved.orientation,
       viewPly:
         game &&

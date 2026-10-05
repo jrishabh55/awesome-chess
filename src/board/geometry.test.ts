@@ -3,9 +3,17 @@ import { Chess } from 'chess.js';
 import { arrowPath } from './geometry';
 import { reconcilePieces } from './pieces';
 it('draws knight arrows with an orthogonal longer first leg in either orientation', () => {
-  expect(arrowPath({ x: 1.5, y: 7.5 }, { x: 2.5, y: 5.5 })).toBe('M 1.5 7.5 L 1.5 5.5 L 2.5 5.5');
-  expect(arrowPath({ x: 6.5, y: 0.5 }, { x: 5.5, y: 2.5 })).toBe('M 6.5 0.5 L 6.5 2.5 L 5.5 2.5');
-  expect(arrowPath({ x: 0, y: 0 }, { x: 3, y: 3 })).toBe('M 0 0 L 3 3');
+  expect(arrowPath({ x: 1.5, y: 7.5 }, { x: 2.5, y: 5.5 })).toBe('M 1.5 7.12 L 1.5 5.5 L 2.5 5.5');
+  expect(arrowPath({ x: 6.5, y: 0.5 }, { x: 5.5, y: 2.5 })).toBe('M 6.5 0.88 L 6.5 2.5 L 5.5 2.5');
+  const diagonal = arrowPath({ x: 0, y: 0 }, { x: 3, y: 3 }).split(' ').map(Number);
+  expect(Math.hypot(diagonal[1], diagonal[2])).toBeCloseTo(0.38);
+  expect(diagonal.slice(-2)).toEqual([3, 3]);
+});
+it('starts straight arrows near the source square edge and does not overshoot a short preview', () => {
+  expect(arrowPath({ x: 3.5, y: 2.5 }, { x: 3.5, y: 3.5 })).toBe('M 3.5 2.88 L 3.5 3.5');
+  const short = arrowPath({ x: 1, y: 1 }, { x: 1.1, y: 1 }).split(' ').map(Number);
+  expect(short[1]).toBeGreaterThan(1);
+  expect(short[1]).toBeLessThan(1.1);
 });
 it('keeps the moving piece identity through moves and reverse navigation', () => {
   const c = new Chess();

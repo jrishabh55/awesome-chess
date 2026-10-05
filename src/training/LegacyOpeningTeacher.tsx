@@ -58,7 +58,7 @@ export function LegacyOpeningTeacher({
   const [active, setActive] = useState(!!initialPack);
   const [orientation, setOrientation] = useState<Color>(saved?.pack.side || 'w');
   const [drawingMode, setDrawingMode] = useState<DrawingMode>('move');
-  const [drawingColor, setDrawingColor] = useState<DrawingColor>('red');
+  const [drawingColor, setDrawingColor] = useState<DrawingColor>('green');
   const [annotations, setAnnotations] = useState<Record<string, Mark[]>>({});
   const [dialog, setDialog] = useState<'catalog' | 'reset' | 'note' | 'settings' | null>(null);
   const [storageError, setStorageError] = useState(false);

@@ -51,7 +51,7 @@ export function ModeBoard({
       {!header && (bottom ?? player(board.orientation))}
       {tools}
       <div className="board-caption">
-        <span>Right-click / drag: red · Ctrl: orange · Shift: green</span>
+        <span>Right-click / drag: selected color · Ctrl: orange · Shift: green</span>
         <span>{caption ?? 'On this device'}</span>
       </div>
       {children}

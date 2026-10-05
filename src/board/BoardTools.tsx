@@ -1,4 +1,4 @@
-import { ArrowDownUp, ArrowUpRight, Eraser, MousePointer2, Settings2, Square } from 'lucide-react';
+import { ArrowDownUp, ArrowUpRight, Eraser, MousePointer2, Settings, Square } from 'lucide-react';
 import type { DrawingColor } from '../chess/types';
 export type DrawingMode = 'move' | 'arrow' | 'square';
 export function BoardTools({
@@ -69,7 +69,7 @@ export function BoardTools({
         </button>
         {onSettings && (
           <button title="Board settings" aria-label="Board settings" onClick={onSettings}>
-            <Settings2 size={18} />
+            <Settings size={18} />
           </button>
         )}
       </div>

@@ -98,6 +98,9 @@
   pointer-events: none;
   z-index: 1;
 }
+.board-arrow-layer {
+  z-index: 4;
+}
 .legal {
   width: 26%;
   height: 26%;

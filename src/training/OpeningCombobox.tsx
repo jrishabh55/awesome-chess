@@ -308,12 +308,14 @@ export function OpeningCombobox({
   onChange,
   disabled,
   label = 'Opening name, variation, or ECO',
+  showMoves = false,
 }: {
   entries: CatalogOpening[];
   value: CatalogOpening | null;
   onChange: (opening: CatalogOpening | null) => void;
   disabled?: boolean;
   label?: string;
+  showMoves?: boolean;
 }) {
   return (
     <PickerCombobox
@@ -323,12 +325,15 @@ export function OpeningCombobox({
       label={label}
       placeholder="Sicilian Dragon, London, B90…"
       searchItems={(query) => searchOpeningCatalog(entries, query, 0, 40)}
-      getLabel={(entry) => `${entry.eco} · ${entry.name}`}
+      getLabel={(entry) => `${entry.eco} · ${entry.name}${showMoves ? ` · ${entry.pgn}` : ''}`}
       getSearchText={(entry) => entry.name}
       renderOption={(entry) => (
         <>
           <span className="oc-eco">{entry.eco}</span>
-          <span className="oc-name">{entry.name}</span>
+          <span className="oc-name">
+            {entry.name}
+            {showMoves && <small className="oc-opening-moves">{entry.pgn}</small>}
+          </span>
         </>
       )}
     />

@@ -4,12 +4,15 @@ for (const viewport of [
   { width: 1440, height: 900 },
   { width: 812, height: 375 },
 ]) {
-  test(`modes share board geometry without the lesson bar and keep controls accessible at ${viewport.width}×${viewport.height}`, async ({
+  test(`modes share board geometry without move banners and keep controls accessible at ${viewport.width}×${viewport.height}`, async ({
     page,
   }) => {
     await page.setViewportSize(viewport);
     await page.goto('./');
     await page.getByRole('switch', { name: 'Engine analysis' }).click();
+    await page.getByRole('button', { name: 'Board settings', exact: true }).click();
+    await page.getByRole('checkbox', { name: 'Show thought bubbles', exact: true }).uncheck();
+    await page.getByRole('button', { name: 'Close dialog', exact: true }).click();
     const original = await page.locator('.chessboard').boundingBox();
     const menu = page.getByRole('navigation', { name: 'Workspace' });
     for (const mode of ['Game review', 'Opening teacher', 'Play Stockfish']) {
@@ -19,6 +22,9 @@ for (const viewport of [
         await page.getByRole('combobox', { name: 'Opening course', exact: true }).fill('London');
         await page.getByRole('option', { name: 'London System', exact: true }).click();
         await page.getByRole('button', { name: 'Start London System', exact: true }).click();
+        await page.getByRole('button', { name: 'Board settings', exact: true }).click();
+        await page.getByRole('checkbox', { name: 'Show thought bubbles', exact: true }).check();
+        await page.getByRole('button', { name: 'Close opening dialog', exact: true }).click();
       }
       if (mode === 'Play Stockfish') {
         await page.getByRole('button', { name: 'Start game', exact: true }).click();

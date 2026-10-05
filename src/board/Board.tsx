@@ -14,7 +14,7 @@ import { pointToSquare, squareToPoint } from './coordinates';
 import { MoveQualityIcon } from '../ui/MoveQualityIcon';
 import { GameOutcomeBadge } from '../ui/GameOutcomeBadge';
 import type { GameOutcome } from '../chess/outcome';
-import { arrowPath, type Point } from './geometry';
+import { arrowShape, type Point } from './geometry';
 import { reconcilePieces } from './pieces';
 import { labelInfo, type Label } from '../review/policy';
 const hues: Record<DrawingColor, string> = {
@@ -166,7 +166,7 @@ export function Board({
                   ? 'orange'
                   : e.shiftKey
                     ? 'green'
-                    : 'red'
+                    : drawingColor
                 : drawingColor,
             right: e.button === 2 || e.ctrlKey,
           };
@@ -266,6 +266,24 @@ export function Board({
             </button>
           );
         })}
+        <svg className="board-overlay board-square-layer" viewBox="0 0 8 8" aria-hidden="true">
+          {allMarks
+            .filter((mark) => mark.kind === 'square')
+            .map((mark, i) => {
+              const p = squareToPoint(mark.square, orientation);
+              return (
+                <rect
+                  key={i}
+                  x={p.x - 0.5}
+                  y={p.y - 0.5}
+                  width="1"
+                  height="1"
+                  fill={hues[mark.color]}
+                  opacity=".65"
+                />
+              );
+            })}
+        </svg>
         <div className="piece-layer" aria-hidden="true">
           {pieces.map((piece) => {
             const position = squareToPoint(piece.square, orientation);
@@ -298,66 +316,67 @@ export function Board({
             );
           })}
         </div>
-        <svg className="board-overlay" viewBox="0 0 8 8" aria-hidden="true">
+        <svg className="board-overlay board-arrow-layer" viewBox="0 0 8 8" aria-hidden="true">
           <defs>
             {Object.entries(hues).map(([key, color]) => (
               <marker
                 key={key}
                 id={`arrow-${key}`}
                 viewBox="0 0 10 10"
-                refX="7"
+                refX="10"
                 refY="5"
-                markerWidth="3"
-                markerHeight="3"
+                markerUnits="userSpaceOnUse"
+                markerWidth=".36"
+                markerHeight=".52"
+                preserveAspectRatio="none"
                 orient="auto-start-reverse"
               >
                 <path d="M 0 0 L 10 5 L 0 10 z" fill={color} />
               </marker>
             ))}
           </defs>
-          {allMarks.map((mark, i) => {
-            if (mark.kind === 'square') {
-              const p = squareToPoint(mark.square, orientation);
+          {allMarks
+            .filter((mark) => mark.kind === 'arrow')
+            .map((mark, i) => {
+              const a = squareToPoint(mark.from, orientation),
+                b = squareToPoint(mark.to, orientation),
+                shape = arrowShape(a, b);
               return (
-                <rect
+                <path
+                  className="annotation-arrow"
                   key={i}
-                  x={p.x - 0.5}
-                  y={p.y - 0.5}
-                  width="1"
-                  height="1"
-                  fill={hues[mark.color]}
+                  d={shape.path}
+                  fill="none"
+                  stroke={hues[mark.color]}
+                  strokeWidth=".22"
+                  strokeDasharray={shape.strokeDasharray}
                   opacity=".65"
+                  strokeLinecap="butt"
+                  strokeLinejoin="round"
+                  markerEnd={`url(#arrow-${mark.color})`}
                 />
               );
-            }
-            const a = squareToPoint(mark.from, orientation),
-              b = squareToPoint(mark.to, orientation);
-            return (
-              <path
-                className="annotation-arrow"
-                key={i}
-                d={arrowPath(a, b)}
-                fill="none"
-                stroke={hues[mark.color]}
-                strokeWidth=".14"
-                opacity=".65"
-                strokeLinecap="butt"
-                strokeLinejoin="round"
-                markerEnd={`url(#arrow-${mark.color})`}
-              />
-            );
-          })}
+            })}
           {gesture.current?.draw && pointer && preview && preview !== gesture.current.from && (
             <path
               className="drawing-preview"
-              d={arrowPath(
-                squareToPoint(gesture.current.from, orientation),
-                pointer,
-                squareToPoint(preview, orientation),
-              )}
+              d={
+                arrowShape(
+                  squareToPoint(gesture.current.from, orientation),
+                  pointer,
+                  squareToPoint(preview, orientation),
+                ).path
+              }
+              strokeDasharray={
+                arrowShape(
+                  squareToPoint(gesture.current.from, orientation),
+                  pointer,
+                  squareToPoint(preview, orientation),
+                ).strokeDasharray
+              }
               fill="none"
               stroke={hues[gesture.current.color]}
-              strokeWidth=".14"
+              strokeWidth=".22"
               strokeLinecap="butt"
               strokeLinejoin="round"
               opacity=".65"

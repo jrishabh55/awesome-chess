@@ -10,11 +10,16 @@ import {
   RotateCcw,
   User,
   X,
+  Settings,
 } from 'lucide-react';
 import { BoardTools } from '../board/BoardTools';
 import { BoardNavigation } from '../board/BoardNavigation';
 import { useMoveKeyPacing } from '../board/useMoveKeyPacing';
 import { ModeBoard } from '../app/ModeBoard';
+import { MoveBanner } from '../board/MoveBanner';
+import { Chess, type Square } from 'chess.js';
+import { OpeningCombobox } from '../training/OpeningCombobox';
+import { loadOpeningCatalog, type CatalogOpening } from '../openings/catalog';
 import { MoveList } from '../review/MoveList';
 import { chessAt, positionAt, createStudy } from '../chess/tree';
 import { outcomeAt } from '../chess/outcome';
@@ -26,6 +31,8 @@ import {
   advanceGame,
   annotateGame,
   createGame,
+  changeGameStrength,
+  nextOpeningMove,
   defaultSettings,
   navigateHistory,
   resignGame,
@@ -95,7 +102,16 @@ export function PlayStockfish({
   const [session, setSession] = useState(initialSession);
   const current = useRef(session);
   const [setup, setSetup] = useState(!session.game);
+  const [editingSettings, setEditingSettings] = useState(false);
+  const [catalog, setCatalog] = useState<CatalogOpening[]>([]);
+  const [catalogError, setCatalogError] = useState('');
+  const [catalogRetry, setCatalogRetry] = useState(0);
   const [draft, setDraft] = useState<PlaySettings>(session.settings);
+  const draftOpening = draft.opening
+    ? catalog.find(
+        (entry) => entry.name === draft.opening!.name && entry.pgn === draft.opening!.pgn,
+      ) || null
+    : null;
   const [confirmResign, setConfirmResign] = useState(false);
   const [drawingMode, setDrawingMode] = useState<'move' | 'arrow' | 'square'>('move');
   const [drawingColor, setDrawingColor] = useState<DrawingColor>('green');
@@ -104,6 +120,7 @@ export function PlayStockfish({
   const [engineError, setEngineError] = useState('');
   const [ready, setReady] = useState(false);
   const [thinking, setThinking] = useState(false);
+  const [openingHint, setOpeningHint] = useState(false);
   const [retry, setRetry] = useState(0);
   const engine = useRef<PlayEngine | null>(null);
   const game = session.game;
@@ -127,6 +144,19 @@ export function PlayStockfish({
   const ended = Boolean(outcome);
   const human = game?.humanColor || 'w';
   const selectedStrength = strengthFor(game?.strengthId || session.settings.strengthId);
+  const openingMove = game && !viewingHistory ? nextOpeningMove(game) : null;
+  const hintedMove = useMemo(() => {
+    if (!openingHint || !openingMove) return null;
+    const before = new Chess(chess.fen());
+    const piece = before.get(openingMove.slice(0, 2) as Square)!;
+    const move = before.move({
+      from: openingMove.slice(0, 2),
+      to: openingMove.slice(2, 4),
+      promotion: openingMove[4],
+    });
+    return { piece, move };
+  }, [openingHint, openingMove, chess]);
+  useEffect(() => setOpeningHint(false), [game?.study.selectedId]);
   const commit = (next: PlaySession) => {
     current.current = next;
     setSession(next);
@@ -139,10 +169,31 @@ export function PlayStockfish({
   };
 
   useEffect(() => {
+    if (!setup || editingSettings) return;
+    let active = true;
+    setCatalogError('');
+    void loadOpeningCatalog()
+      .then((entries) => {
+        if (active) setCatalog(entries);
+      })
+      .catch((error) => {
+        if (active) setCatalogError(errorText(error));
+      });
+    return () => {
+      active = false;
+    };
+  }, [setup, editingSettings, catalogRetry]);
+  const openSettings = () => {
+    setDraft({ ...session.settings, strengthId: game?.strengthId || session.settings.strengthId });
+    setEditingSettings(Boolean(game));
+    setSetup(true);
+  };
+
+  useEffect(() => {
     setReady(false);
     setThinking(false);
     setEngineError('');
-    if (!game || ended) {
+    if (!game || ended || setup) {
       engine.current?.dispose();
       engine.current = null;
       return;
@@ -168,16 +219,26 @@ export function PlayStockfish({
       client.dispose();
       if (engine.current === client) engine.current = null;
     };
-  }, [game?.study.id, ended, retry]);
+  }, [game?.study.id, ended, retry, setup]);
 
   useEffect(() => {
-    if (!game || ended || !ready || chess.turn() === human || !engine.current) return;
+    if (!game || ended || setup || !ready || chess.turn() === human || !engine.current) return;
     const controller = new AbortController();
     const id = game.study.id,
       node = game.study.selectedId;
     setThinking(true);
-    void engine.current
-      .bestMove(positionAt(game.study, node), selectedStrength.value, controller.signal)
+    const scripted = nextOpeningMove(game);
+    let openingTimer: ReturnType<typeof setTimeout> | undefined;
+    const reply = scripted
+      ? new Promise<string>((resolve) => {
+          openingTimer = setTimeout(() => resolve(scripted), 550);
+        })
+      : engine.current.bestMove(
+          positionAt(game.study, node),
+          selectedStrength.value,
+          controller.signal,
+        );
+    void reply
       .then((move) => {
         const latest = current.current;
         if (
@@ -197,8 +258,11 @@ export function PlayStockfish({
           setReady(false);
         }
       });
-    return () => controller.abort();
-  }, [game?.study.id, game?.study.selectedId, ended, ready, human]);
+    return () => {
+      controller.abort();
+      clearTimeout(openingTimer);
+    };
+  }, [game?.study.id, game?.study.selectedId, game?.strengthId, ended, ready, human, setup]);
 
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
@@ -246,6 +310,7 @@ export function PlayStockfish({
     if (
       !latest.game ||
       (latest.viewPly != null && latest.viewPly < latest.game.study.mainline.length) ||
+      setup ||
       !ready ||
       engineError ||
       latest.game.study.headers.Result !== '*' ||
@@ -264,6 +329,16 @@ export function PlayStockfish({
     commit({ game: next, settings: draft, orientation: next.humanColor, viewPly: null });
     setDrawingMode('move');
     setReady(false);
+    setSetup(false);
+  };
+  const applySettings = () => {
+    const latest = current.current;
+    if (!latest.game) return;
+    commit({
+      ...latest,
+      settings: { ...latest.settings, strengthId: draft.strengthId },
+      game: changeGameStrength(latest.game, draft.strengthId),
+    });
     setSetup(false);
   };
   const flip = () => {
@@ -329,15 +404,48 @@ export function PlayStockfish({
         <span className="play-local">
           <Check size={14} /> On your device
         </span>
+        <button
+          className="play-settings-icon"
+          title="Game settings"
+          aria-label="Game settings"
+          onClick={openSettings}
+        >
+          <Settings size={20} />
+        </button>
       </header>
       <div className="play-layout">
         <ModeBoard
           key={study.id}
+          header={
+            hintedMove &&
+            game?.opening && (
+              <MoveBanner
+                positionKey={`${study.id}:${study.selectedId}:hint`}
+                square={hintedMove.move.from}
+                piece={hintedMove.piece}
+                from={hintedMove.move.from}
+                to={hintedMove.move.to}
+                capture={Boolean(hintedMove.move.captured)}
+                text={`In this opening, play ${hintedMove.move.san}.`}
+                label="Opening hint"
+              />
+            )
+          }
           board={{
             fen: displayNode.fen,
             orientation: session.orientation,
             lastMove: displayNode.uci,
             marks: displayNode.marks,
+            engineMarks: hintedMove
+              ? [
+                  {
+                    kind: 'arrow',
+                    from: hintedMove.move.from,
+                    to: hintedMove.move.to,
+                    color: 'green',
+                  },
+                ]
+              : [],
             drawingMode,
             drawingColor,
             onMove: move,
@@ -361,6 +469,7 @@ export function PlayStockfish({
               onColor={setDrawingColor}
               onClear={() => annotate()}
               onFlip={flip}
+              onSettings={openSettings}
             />
           }
           caption={
@@ -384,6 +493,20 @@ export function PlayStockfish({
             </div>
             <h2>{title}</h2>
             <p>{subtitle}</p>
+            {game?.opening && (
+              <p className="play-opening-status">
+                <strong title={game.opening.name}>{game.opening.name}</strong> ·{' '}
+                {nextOpeningMove(game) ? 'Opening practice' : 'Free play'}
+              </p>
+            )}
+            {openingMove && chess.turn() === human && (
+              <button
+                className="play-opening-hint"
+                onClick={() => setOpeningHint((value) => !value)}
+              >
+                {openingHint ? 'Hide opening move' : 'Show opening move'}
+              </button>
+            )}
           </div>
           {game && !ready && !ended && !engineError && (
             <div className="play-download">
@@ -441,6 +564,7 @@ export function PlayStockfish({
               className={ended || !game ? 'play-primary' : 'play-secondary'}
               onClick={() => {
                 setDraft(session.settings);
+                setEditingSettings(false);
                 setSetup(true);
               }}
             >
@@ -468,32 +592,75 @@ export function PlayStockfish({
         </aside>
       </div>
       {setup && (
-        <PlayDialog title="New game" onClose={() => setSetup(false)}>
+        <PlayDialog
+          title={editingSettings ? 'Game settings' : 'New game'}
+          onClose={() => setSetup(false)}
+        >
           <p className="play-dialog-intro">
-            Your next opponent is ready. Make it a fair fight or a serious challenge.
+            {editingSettings
+              ? 'Change the opponent’s strength and continue your current game.'
+              : 'Choose your side, opponent strength, and an optional opening to practice.'}
           </p>
-          <fieldset>
-            <legend>Choose your side</legend>
-            <div className="play-side-options">
-              {(
-                [
-                  { value: 'w', label: 'White' },
-                  { value: 'random', label: 'Random' },
-                  { value: 'b', label: 'Black' },
-                ] as const
-              ).map((side) => (
-                <button
-                  key={side.value}
-                  role="radio"
-                  aria-checked={draft.side === side.value}
-                  className={draft.side === side.value ? 'is-selected' : ''}
-                  onClick={() => setDraft({ ...draft, side: side.value })}
-                >
-                  {side.label}
-                </button>
-              ))}
-            </div>
-          </fieldset>
+          {!editingSettings && (
+            <fieldset>
+              <legend>Choose your side</legend>
+              <div className="play-side-options">
+                {(
+                  [
+                    { value: 'w', label: 'White' },
+                    { value: 'random', label: 'Random' },
+                    { value: 'b', label: 'Black' },
+                  ] as const
+                ).map((side) => (
+                  <button
+                    key={side.value}
+                    role="radio"
+                    aria-checked={draft.side === side.value}
+                    className={draft.side === side.value ? 'is-selected' : ''}
+                    onClick={() => setDraft({ ...draft, side: side.value })}
+                  >
+                    {side.label}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+          )}
+          {!editingSettings && (
+            <fieldset>
+              <legend>Opening practice</legend>
+              <OpeningCombobox
+                entries={catalog}
+                value={draftOpening}
+                label="Opening to practice"
+                showMoves
+                disabled={!catalog.length}
+                onChange={(opening) =>
+                  setDraft((current) => {
+                    const { opening: _, ...rest } = current;
+                    return opening
+                      ? {
+                          ...rest,
+                          opening: { name: opening.name, eco: opening.eco, pgn: opening.pgn },
+                        }
+                      : rest;
+                  })
+                }
+              />
+              <p className="play-rating-note">
+                {draft.opening
+                  ? `${draft.opening.pgn} · Stockfish follows this line while your moves match it, then plays freely.`
+                  : 'Leave this empty for a regular game. In opening practice you play your own moves from the starting position.'}
+              </p>
+              {catalogError && (
+                <p role="alert" className="play-error">
+                  {catalogError}
+                  <button onClick={() => setCatalogRetry((value) => value + 1)}>
+                    Retry opening database
+                  </button>
+                </p>
+              )}
+            </fieldset>
+          )}
           <fieldset>
             <legend>Opponent strength</legend>
             <div className="play-strength-options">
@@ -516,11 +683,11 @@ export function PlayStockfish({
             Elo targets are approximate, not calibrated human ratings. This lightweight engine and
             short thinking time affect playing strength. Skill 0 is Stockfish’s easiest setting.
           </p>
-          {game && !ended && (
+          {!editingSettings && game && !ended && (
             <p className="play-rating-note">Starting a new game replaces this unfinished game.</p>
           )}
-          <button className="play-primary" onClick={start}>
-            Start game <ChevronRight size={18} />
+          <button className="play-primary" onClick={editingSettings ? applySettings : start}>
+            {editingSettings ? 'Apply settings' : 'Start game'} <ChevronRight size={18} />
           </button>
         </PlayDialog>
       )}

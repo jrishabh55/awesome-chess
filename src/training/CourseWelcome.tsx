@@ -22,7 +22,7 @@ export function CourseWelcome({
   const [open, setOpen] = useState(false);
   const [orientation, setOrientation] = useState<Color>('w');
   const [mode, setMode] = useState<DrawingMode>('move');
-  const [color, setColor] = useState<DrawingColor>('red');
+  const [color, setColor] = useState<DrawingColor>('green');
   const [marks, setMarks] = useState<Mark[]>([]);
   const dialog = useRef<HTMLDialogElement>(null);
   const flip = () => setOrientation((value) => (value === 'w' ? 'b' : 'w'));

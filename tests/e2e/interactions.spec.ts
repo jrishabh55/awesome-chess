@@ -117,7 +117,7 @@ test('right drawing uses the same color shortcuts for squares and smooth knight 
 }) => {
   await quietBoard(page);
   const cases = [
-    { modifiers: [], color: '#f65c54', square: 'a3', from: 'b1', to: 'c3' },
+    { modifiers: [], color: '#8fbb55', square: 'a3', from: 'b1', to: 'c3' },
     { modifiers: ['Control'], color: '#ffb547', square: 'a4', from: 'g1', to: 'f3' },
     { modifiers: ['Shift'], color: '#8fbb55', square: 'a5', from: 'b8', to: 'c6' },
   ] as const;
@@ -126,7 +126,7 @@ test('right drawing uses the same color shortcuts for squares and smooth knight 
       button: 'right',
       modifiers: [...sample.modifiers],
     });
-    const square = page.locator(`.board-overlay rect[fill="${sample.color}"]`);
+    const square = page.locator(`.board-overlay rect[fill="${sample.color}"]`).last();
     await expect(square).toHaveCount(1);
     await expect(square).toHaveAttribute('opacity', '.65');
     const from = await center(page, sample.from),
@@ -145,18 +145,28 @@ test('right drawing uses the same color shortcuts for squares and smooth knight 
     await page.mouse.move(to.x, to.y);
     await page.mouse.up({ button: 'right' });
     for (const key of sample.modifiers) await page.keyboard.up(key);
-    const arrow = page.locator(`.annotation-arrow[stroke="${sample.color}"]`);
+    const arrow = page.locator(`.annotation-arrow[stroke="${sample.color}"]`).last();
     await expect(arrow).toHaveCount(1);
     await expect(arrow).toHaveAttribute('opacity', '.65');
     await expect(arrow).toHaveAttribute('stroke-linecap', 'butt');
-    if (index === 0) await expect(arrow).toHaveAttribute('d', 'M 1.5 7.5 L 1.5 5.5 L 2.5 5.5');
+    if (index === 0) await expect(arrow).toHaveAttribute('d', 'M 1.5 7.12 L 1.5 5.5 L 2.5 5.5');
+    await expect(arrow).toHaveAttribute('stroke-width', '.22');
     await expect(page.locator('.board-overlay rect')).toHaveCount(index + 1);
     await expect(page.locator('.annotation-arrow')).toHaveCount(index + 1);
+    const layers = await arrow.evaluate((path) => ({
+      arrow: Number(getComputedStyle(path.closest('svg')!).zIndex),
+      pieces: Number(getComputedStyle(document.querySelector('.piece-layer')!).zIndex),
+      squares: Number(
+        getComputedStyle(document.querySelector('.board-overlay rect')!.closest('svg')!).zIndex,
+      ),
+    }));
+    expect(layers.arrow).toBeGreaterThan(layers.pieces);
+    expect(layers.squares).toBeLessThan(layers.pieces);
   }
   // A second click toggles only that square; all other annotations survive.
   await page.getByRole('gridcell', { name: 'a3 empty', exact: true }).click({ button: 'right' });
   await expect(page.locator('.board-overlay rect')).toHaveCount(2);
-  await expect(page.locator('.board-overlay rect[fill="#f65c54"]')).toHaveCount(0);
+  await expect(page.locator('.board-overlay rect[fill="#8fbb55"]')).toHaveCount(1);
   await expect(page.locator('.annotation-arrow')).toHaveCount(3);
   await page.getByRole('button', { name: 'Clear annotations', exact: true }).click();
   await expect(page.locator('.board-overlay rect')).toHaveCount(0);

@@ -15,6 +15,25 @@
   gap: 12px;
   border-bottom: 1px solid #3a3e34;
 }
+.play-settings-icon {
+  display: grid;
+  place-items: center;
+  padding: 7px;
+  border-radius: 7px;
+  border: 1px solid #454c3d;
+}
+.play-header .play-local {
+  margin-left: auto;
+}
+.play-opening-status {
+  color: #b6d68c;
+}
+.play-opening-hint {
+  color: #b6d68c;
+  font-size: 11px;
+  text-decoration: underline;
+  padding: 3px 0;
+}
 .play-header h1 {
   display: flex;
   align-items: center;

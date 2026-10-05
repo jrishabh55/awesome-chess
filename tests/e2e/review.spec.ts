@@ -39,6 +39,9 @@ test('imports a short completed game and reviews both players', async ({ page })
   await expect(page.locator('.accuracy-card strong').first()).not.toHaveText('—');
   await page.getByRole('button', { name: 'Close dialog' }).click();
   await page.getByRole('button', { name: 'Start guided review' }).click();
+  await expect(page.getByRole('status', { name: 'Move thought' })).toBeVisible();
+  await page.getByRole('button', { name: 'Board settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Move coach', exact: true }).click();
   await expect(page.locator('.coach-card')).toBeVisible();
   const retry = page.getByRole('button', { name: 'Retry move', exact: true });
   if (await retry.isVisible()) {
