@@ -1,7 +1,6 @@
 import { Chess } from 'chess.js';
 import type { Study, Square } from '../chess/types';
-import type { MoveAssessment } from '../review/policy';
-import { labelInfo } from '../review/policy';
+import type { Label, MoveAssessment } from '../review/policy';
 import { MoveQualityIcon } from '../ui/MoveQualityIcon';
 import { MoveBanner } from '../board/MoveBanner';
 import { explainMove } from './explain';
@@ -13,6 +12,20 @@ const names: Record<string, string> = {
   r: 'rook',
   q: 'queen',
   k: 'king',
+};
+
+// Banner text is white; these deeper badge colors keep every label readable.
+const bannerColors: Record<Label, string> = {
+  Brilliant: '#087a73',
+  Great: '#087a73',
+  Best: '#50752a',
+  Excellent: '#50752a',
+  Good: '#54714c',
+  Book: '#7c654b',
+  Inaccuracy: '#966b00',
+  Mistake: '#b85c0b',
+  Blunder: '#c73d36',
+  Miss: '#956b00',
 };
 
 export function ReviewMoveBanner({
@@ -62,7 +75,7 @@ export function ReviewMoveBanner({
       label={assessment ? `${assessment.primary} move` : 'Played move'}
       action={action}
       labelIcon={assessment ? <MoveQualityIcon label={assessment.primary} size={16} /> : undefined}
-      labelColor={assessment ? labelInfo[assessment.primary].color : undefined}
+      labelColor={assessment ? bannerColors[assessment.primary] : undefined}
     />
   );
 }

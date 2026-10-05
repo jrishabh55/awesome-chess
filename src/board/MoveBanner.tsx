@@ -66,7 +66,9 @@ export function MoveBanner({
         className="move-thought-stage"
         style={labelColor ? { background: labelColor } : undefined}
       >
-        {labelIcon ?? <BookOpen size={15} />}
+        <span className="move-thought-stage-icon" aria-hidden="true">
+          {labelIcon ?? <BookOpen size={15} />}
+        </span>
         {label}
       </span>
       <button
