@@ -1,5 +1,6 @@
 import { mkdir, writeFile, copyFile, readFile, stat } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
+import { prepareMaia } from './prepare-maia.mjs';
 const json = async (url) => {
   const r = await fetch(url);
   if (!r.ok) throw Error(`${url}: ${r.status}`);
@@ -53,6 +54,7 @@ if (!process.argv.includes('--data-only')) {
     `// Generated from the pinned engine asset checksums.\nexport const ENGINE_BUILD_ID = '${buildId}';\n`,
   );
   console.log('Stockfish assets prepared');
+  await prepareMaia();
 }
 if (process.argv.includes('--engine-only')) process.exit(0);
 const revision = JSON.parse(await readFile('scripts/asset-sources.json', 'utf8')).openingsRevision;

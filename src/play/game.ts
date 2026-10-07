@@ -1,6 +1,14 @@
 import type { Color, Mark, Study } from '../chess/types';
 import { chessAt, createStudy, playMove, positionAt, toggleMark } from '../chess/tree';
-import type { Strength } from './engine';
+import {
+  opponentFor,
+  opponentName,
+  opponentLabel,
+  readOpponent,
+  strengthFor,
+  type Opponent,
+} from './opponents';
+export { strengths, strengthFor } from './opponents';
 import { openingPractice, readOpening, type PlayOpening } from './openings';
 export { openingMoves, type PlayOpening } from './openings';
 export function nextOpeningMove(game: PlayGame): string | null {
@@ -9,45 +17,10 @@ export function nextOpeningMove(game: PlayGame): string | null {
   return practice.kind === 'following' ? practice.nextMove : null;
 }
 
-// Stockfish documents Elo 1320–3190 and Skill Level 0–20. Its calibration
-// uses 120s+1s; these short, lite-engine games are approximate targets only.
-// https://official-stockfish.github.io/docs/stockfish-wiki/UCI-Protocol-and-Stockfish-Commands.html
-export const strengths: { id: string; label: string; detail: string; value: Strength }[] = [
-  {
-    id: 'skill-0',
-    label: 'Skill 0',
-    detail: 'Easiest Stockfish setting',
-    value: { kind: 'skill', value: 0 },
-  },
-  {
-    id: 'elo-1320',
-    label: '≈1320 Elo',
-    detail: 'A gentle challenge',
-    value: { kind: 'elo', value: 1320 },
-  },
-  {
-    id: 'elo-1600',
-    label: '≈1600 Elo',
-    detail: 'Build your confidence',
-    value: { kind: 'elo', value: 1600 },
-  },
-  {
-    id: 'elo-2000',
-    label: '≈2000 Elo',
-    detail: 'A stronger opponent',
-    value: { kind: 'elo', value: 2000 },
-  },
-  {
-    id: 'elo-2400',
-    label: '≈2400 Elo',
-    detail: 'A serious challenge',
-    value: { kind: 'elo', value: 2400 },
-  },
-  { id: 'full', label: 'Full strength', detail: 'No strength limit', value: { kind: 'full' } },
-];
 export interface PlaySettings {
   side: Color | 'random';
   strengthId: string;
+  opponent?: Opponent;
   opening?: PlayOpening;
   followOpeningVariations?: boolean;
 }
@@ -55,6 +28,7 @@ export interface PlayGame {
   study: Study;
   humanColor: Color;
   strengthId: string;
+  opponent: Opponent;
   startedAt: number;
   opening?: PlayOpening;
   followOpeningVariations: boolean;
@@ -71,11 +45,13 @@ export const defaultSettings: PlaySettings = {
   strengthId: 'skill-0',
   followOpeningVariations: true,
 };
-export const strengthFor = (id: string) => strengths.find((s) => s.id === id) || strengths[0];
 
 export function createGame(settings: PlaySettings): PlayGame {
   const humanColor = settings.side === 'random' ? (Math.random() < 0.5 ? 'w' : 'b') : settings.side;
-  const strength = strengthFor(settings.strengthId);
+  const opponent = opponentFor(settings);
+  const strength = strengthFor(
+    opponent.kind === 'stockfish' ? opponent.strengthId : settings.strengthId,
+  );
   const study = createStudy();
   const startedAt = Date.now();
   const followOpeningVariations = settings.followOpeningVariations !== false;
@@ -85,11 +61,11 @@ export function createGame(settings: PlaySettings): PlayGame {
       ? { name: selected.name, eco: selected.eco, pgn: selected.pgn }
       : selected;
   study.headers = {
-    Event: 'Casual game vs Stockfish',
+    Event: `Casual game vs ${opponentName(opponent)}`,
     Site: 'Chess Room',
     Date: new Date(startedAt).toISOString().slice(0, 10).replaceAll('-', '.'),
-    White: humanColor === 'w' ? 'You' : `Stockfish 19 · ${strength.label}`,
-    Black: humanColor === 'b' ? 'You' : `Stockfish 19 · ${strength.label}`,
+    White: humanColor === 'w' ? 'You' : `${opponentName(opponent)} · ${opponentLabel(opponent)}`,
+    Black: humanColor === 'b' ? 'You' : `${opponentName(opponent)} · ${opponentLabel(opponent)}`,
     Result: '*',
     ...(opening ? { Opening: opening.name, ECO: opening.eco } : {}),
   };
@@ -97,6 +73,7 @@ export function createGame(settings: PlaySettings): PlayGame {
     study,
     humanColor,
     strengthId: strength.id,
+    opponent,
     startedAt,
     followOpeningVariations,
     ...(opening ? { opening } : {}),
@@ -107,26 +84,37 @@ export function replayOpening(game: PlayGame): PlayGame {
   return createGame({
     side: game.humanColor,
     strengthId: game.strengthId,
+    opponent:
+      game.opponent.kind === 'stockfish'
+        ? { kind: 'stockfish', strengthId: game.strengthId }
+        : game.opponent,
     opening: game.opening,
     followOpeningVariations: game.followOpeningVariations,
   });
 }
 
-export function changeGameStrength(game: PlayGame, strengthId: string): PlayGame {
-  const strength = strengthFor(strengthId);
+export function changeGameOpponent(game: PlayGame, value: Opponent): PlayGame {
+  const opponent = readOpponent(value);
+  if (!opponent) throw Error('Choose a supported opponent strength.');
   return {
     ...game,
-    strengthId: strength.id,
+    opponent,
+    strengthId: opponent.kind === 'stockfish' ? opponent.strengthId : game.strengthId,
     study: {
       ...game.study,
       revision: game.study.revision + 1,
       updatedAt: Date.now(),
       headers: {
         ...game.study.headers,
-        [game.humanColor === 'w' ? 'Black' : 'White']: `Stockfish 19 · ${strength.label}`,
+        Event: `Casual game vs ${opponentName(opponent)}`,
+        [game.humanColor === 'w' ? 'Black' : 'White']:
+          `${opponentName(opponent)} · ${opponentLabel(opponent)}`,
       },
     },
   };
+}
+export function changeGameStrength(game: PlayGame, strengthId: string): PlayGame {
+  return changeGameOpponent(game, { kind: 'stockfish', strengthId });
 }
 
 export function advanceGame(game: PlayGame, move: string): PlayGame {
@@ -226,8 +214,8 @@ function validMark(mark: unknown): mark is Mark {
 export function serializeSession(session: PlaySession): string {
   const game = session.game;
   return JSON.stringify({
-    version: 1,
-    settings: session.settings,
+    version: 2,
+    settings: { ...session.settings, opponent: opponentFor(session.settings) },
     orientation: session.orientation,
     viewPly: session.viewPly ?? null,
     game: game
@@ -236,6 +224,7 @@ export function serializeSession(session: PlaySession): string {
           revision: game.study.revision,
           humanColor: game.humanColor,
           strengthId: game.strengthId,
+          opponent: game.opponent,
           startedAt: game.startedAt,
           opening: game.opening,
           followOpeningVariations: game.followOpeningVariations,
@@ -254,12 +243,18 @@ export function restoreSession(raw: string | null): PlaySession | null {
   try {
     const saved = JSON.parse(raw);
     if (
-      saved.version !== 1 ||
+      ![1, 2].includes(saved.version) ||
       !['w', 'b'].includes(saved.orientation) ||
       !['w', 'b', 'random'].includes(saved.settings?.side) ||
-      !strengths.some((s) => s.id === saved.settings?.strengthId)
+      !readOpponent({ kind: 'stockfish', strengthId: saved.settings?.strengthId })
     )
       return null;
+    const settingsOpponent = readOpponent(
+      saved.version === 1
+        ? { kind: 'stockfish', strengthId: saved.settings.strengthId }
+        : saved.settings.opponent,
+    );
+    if (!settingsOpponent) return null;
     let game: PlayGame | null = null;
     if (saved.game) {
       const g = saved.game;
@@ -268,16 +263,21 @@ export function restoreSession(raw: string | null): PlaySession | null {
         !g.id ||
         (g.revision !== undefined && (!Number.isSafeInteger(g.revision) || g.revision < 0)) ||
         !['w', 'b'].includes(g.humanColor) ||
-        !strengths.some((s) => s.id === g.strengthId) ||
+        !readOpponent({ kind: 'stockfish', strengthId: g.strengthId }) ||
         !Number.isFinite(g.startedAt) ||
         !Array.isArray(g.moves) ||
         g.moves.length > 2000 ||
         typeof g.resigned !== 'boolean'
       )
         return null;
+      const gameOpponent = readOpponent(
+        saved.version === 1 ? { kind: 'stockfish', strengthId: g.strengthId } : g.opponent,
+      );
+      if (!gameOpponent) return null;
       game = createGame({
         side: g.humanColor,
         strengthId: g.strengthId,
+        opponent: gameOpponent,
         opening: readOpening(g.opening),
         followOpeningVariations: g.followOpeningVariations === true,
       });
@@ -309,7 +309,11 @@ export function restoreSession(raw: string | null): PlaySession | null {
       game,
       settings: {
         side: saved.settings.side,
-        strengthId: saved.settings.strengthId,
+        strengthId:
+          settingsOpponent.kind === 'stockfish'
+            ? settingsOpponent.strengthId
+            : saved.settings.strengthId,
+        opponent: settingsOpponent,
         followOpeningVariations: saved.settings.followOpeningVariations !== false,
         ...(readOpening(saved.settings.opening)
           ? { opening: readOpening(saved.settings.opening) }

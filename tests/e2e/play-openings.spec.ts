@@ -6,7 +6,7 @@ test('Stockfish follows a chosen opening, keeps it after reload, and allows stre
   await page.goto('./');
   await page
     .getByRole('navigation', { name: 'Workspace' })
-    .getByRole('button', { name: 'Play Stockfish', exact: true })
+    .getByRole('button', { name: 'Play computer', exact: true })
     .click();
   await page
     .getByRole('combobox', { name: 'Opening to practice', exact: true })
@@ -29,15 +29,15 @@ test('Stockfish follows a chosen opening, keeps it after reload, and allows stre
   await page.reload();
   await page
     .getByRole('navigation', { name: 'Workspace' })
-    .getByRole('button', { name: 'Play Stockfish', exact: true })
+    .getByRole('button', { name: 'Play computer', exact: true })
     .click();
   await page.getByRole('button', { name: 'Game settings', exact: true }).click();
-  await page.getByRole('radio', { name: /≈1600 Elo/ }).click();
+  await page.getByRole('radio', { name: /Easy/ }).click();
   await page.getByRole('button', { name: 'Apply settings', exact: true }).click();
   await expect(page.getByRole('gridcell', { name: 'e4 white pawn', exact: true })).toBeVisible();
   await expect(page.getByRole('gridcell', { name: 'd5 black pawn', exact: true })).toBeVisible();
   await expect(page.locator('.play-player').filter({ hasText: 'Stockfish 19' })).toContainText(
-    '≈1600 Elo',
+    'Easy',
   );
   await expect(page.getByRole('heading', { name: 'Your move', exact: true })).toBeVisible();
   await page.getByRole('gridcell', { name: 'e4 white pawn', exact: true }).click();
@@ -45,17 +45,14 @@ test('Stockfish follows a chosen opening, keeps it after reload, and allows stre
   await expect(page.getByRole('gridcell', { name: 'd5 black queen', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Your move', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Board settings', exact: true }).click();
-  await expect(page.getByRole('radio', { name: /≈1600 Elo/ })).toHaveAttribute(
-    'aria-checked',
-    'true',
-  );
+  await expect(page.getByRole('radio', { name: /Easy/ })).toHaveAttribute('aria-checked', 'true');
 });
 
 test('a Black opening game starts with its selected White reply', async ({ page }) => {
   await page.goto('./');
   await page
     .getByRole('navigation', { name: 'Workspace' })
-    .getByRole('button', { name: 'Play Stockfish', exact: true })
+    .getByRole('button', { name: 'Play computer', exact: true })
     .click();
   await page.getByRole('radio', { name: 'Black', exact: true }).click();
   await page
@@ -79,7 +76,7 @@ test('settings can interrupt a live engine search and resume the same game', asy
   await page.goto('./');
   await page
     .getByRole('navigation', { name: 'Workspace' })
-    .getByRole('button', { name: 'Play Stockfish', exact: true })
+    .getByRole('button', { name: 'Play computer', exact: true })
     .click();
   await page.getByRole('radio', { name: /Full strength/ }).click();
   await page.getByRole('button', { name: 'Start game', exact: true }).click();
@@ -90,7 +87,7 @@ test('settings can interrupt a live engine search and resume the same game', asy
     page.getByRole('heading', { name: 'Stockfish is thinking…', exact: true }),
   ).toBeVisible();
   await page.getByRole('button', { name: 'Game settings', exact: true }).click();
-  await page.getByRole('radio', { name: /≈1600 Elo/ }).click();
+  await page.getByRole('radio', { name: /Easy/ }).click();
   await page.getByRole('button', { name: 'Apply settings', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Your move', exact: true })).toBeVisible();
   await expect(page.getByRole('alert')).toHaveCount(0);
@@ -105,7 +102,7 @@ test('long opening names leave a usable board when a phone shows an opening hint
   await page.goto('./');
   await page
     .getByRole('navigation', { name: 'Workspace' })
-    .getByRole('button', { name: 'Play Stockfish', exact: true })
+    .getByRole('button', { name: 'Play computer', exact: true })
     .click();
   await page
     .getByRole('combobox', { name: 'Opening to practice', exact: true })

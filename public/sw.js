@@ -24,10 +24,15 @@ self.addEventListener('fetch', (event) => {
       const shell = await caches.open(SHELL);
       const bundled = await shell.match(event.request, { ignoreVary: true });
       if (bundled) return bundled;
-      if (url.href.startsWith(scopedUrl('engine/'))) {
+      if (url.href.startsWith(scopedUrl('engine/')) || url.href.startsWith(scopedUrl('maia/'))) {
+        const prefix = url.href.startsWith(scopedUrl('maia/')) ? 'maia' : 'engine';
         const build = url.searchParams.get('build');
         for (const name of await caches.keys())
-          if (build && name.startsWith(`engine-${build}-`) && !name.endsWith('-staging')) {
+          if (
+            build &&
+            (prefix === 'maia' ? name === `maia-${build}` : name.startsWith(`engine-${build}-`)) &&
+            !name.endsWith('-staging')
+          ) {
             const cache = await caches.open(name);
             if (await cache.match(scopedUrl('offline-ready'))) {
               const match = await cache.match(event.request);

@@ -6,3 +6,5 @@ playwright-report/
 public/engine/
 public/data/
 *.tsbuildinfo
+
+public/maia/

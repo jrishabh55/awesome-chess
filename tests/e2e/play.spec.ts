@@ -1,10 +1,49 @@
 import { test, expect } from '@playwright/test';
 
+test('each Stockfish difficulty reaches the real engine with a distinct skill and time budget', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    (window as any).uciCommands = [];
+    const post = Worker.prototype.postMessage;
+    Worker.prototype.postMessage = function (message: any, ...rest: any[]) {
+      if (typeof message === 'string') (window as any).uciCommands.push(message);
+      return (post as any).call(this, message, ...rest);
+    };
+  });
+  await page.goto('./');
+  await page
+    .getByRole('navigation', { name: 'Workspace' })
+    .getByRole('button', { name: 'Play computer', exact: true })
+    .click();
+  for (const [name, skill] of [
+    ['Beginner', 0],
+    ['Easy', 3],
+    ['Medium', 6],
+    ['Hard', 10],
+    ['Very hard', 15],
+    ['Full strength', 20],
+  ] as const) {
+    if (skill > 0) await page.getByRole('button', { name: 'New game', exact: true }).click();
+    await page.getByRole('radio', { name: 'Black', exact: true }).click();
+    await page.getByRole('radio', { name: new RegExp(`^${name} `) }).click();
+    await page.evaluate(() => {
+      (window as any).uciCommands = [];
+    });
+    await page.getByRole('button', { name: 'Start game', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Your move', exact: true })).toBeVisible();
+    const commands = await page.evaluate(() => (window as any).uciCommands as string[]);
+    expect(commands).toContain(`setoption name Skill Level value ${skill}`);
+    expect(commands).toContain('setoption name UCI_LimitStrength value false');
+    expect(commands).toContain(`go movetime ${skill === 20 ? 1500 : 800}`);
+  }
+});
+
 test('plays a legal game, resumes it, flips with X, resigns and opens review', async ({ page }) => {
   await page.goto('');
   await page
     .getByRole('navigation', { name: 'Workspace' })
-    .getByRole('button', { name: 'Play Stockfish', exact: true })
+    .getByRole('button', { name: 'Play computer', exact: true })
     .click();
   await page.getByRole('button', { name: 'Start game', exact: true }).click();
   await expect(page.getByText('Your move', { exact: true })).toBeVisible({ timeout: 120000 });
@@ -20,7 +59,7 @@ test('plays a legal game, resumes it, flips with X, resigns and opens review', a
     .click();
   await page
     .getByRole('navigation', { name: 'Workspace' })
-    .getByRole('button', { name: 'Play Stockfish', exact: true })
+    .getByRole('button', { name: 'Play computer', exact: true })
     .click();
   await expect(page.locator('.play-moves')).toContainText('e4');
   await page.getByRole('button', { name: 'Resign', exact: true }).click();
@@ -35,7 +74,7 @@ test('starts as black and cancels an engine turn when starting a new game', asyn
   await page.goto('');
   await page
     .getByRole('navigation', { name: 'Workspace' })
-    .getByRole('button', { name: 'Play Stockfish', exact: true })
+    .getByRole('button', { name: 'Play computer', exact: true })
     .click();
   await page.getByRole('radio', { name: 'Black', exact: true }).click();
   await page.getByRole('button', { name: 'Start game', exact: true }).click();
@@ -60,7 +99,7 @@ test('keeps board and core controls inside desktop, phone and landscape viewport
   await page.goto('');
   await page
     .getByRole('navigation', { name: 'Workspace' })
-    .getByRole('button', { name: 'Play Stockfish', exact: true })
+    .getByRole('button', { name: 'Play computer', exact: true })
     .click();
   await page.getByRole('button', { name: 'Start game', exact: true }).click();
   await expect(page.getByText('Your move', { exact: true })).toBeVisible({ timeout: 120000 });
@@ -106,7 +145,7 @@ test('browses history during an engine reply and resumes without truncating the 
   await page.goto('');
   await page
     .getByRole('navigation', { name: 'Workspace' })
-    .getByRole('button', { name: 'Play Stockfish', exact: true })
+    .getByRole('button', { name: 'Play computer', exact: true })
     .click();
   await page.getByRole('button', { name: 'Start game', exact: true }).click();
   await expect(page.getByText('Your move', { exact: true })).toBeVisible({ timeout: 120000 });
@@ -126,7 +165,7 @@ test('browses history during an engine reply and resumes without truncating the 
   await page.reload();
   await page
     .getByRole('navigation', { name: 'Workspace' })
-    .getByRole('button', { name: 'Play Stockfish', exact: true })
+    .getByRole('button', { name: 'Play computer', exact: true })
     .click();
   await expect(page.locator('.play-position-caption')).toContainText('half-move 0 of 2');
   const saved = await page.evaluate(() => {
@@ -165,7 +204,7 @@ test('draws with touch controls, keeps drawings per position and clears the view
     await page.goto((process.env.TEST_URL || 'http://127.0.0.1:5173').replace(/\/?$/, '/'));
     await page
       .getByRole('navigation', { name: 'Workspace' })
-      .getByRole('button', { name: 'Play Stockfish', exact: true })
+      .getByRole('button', { name: 'Play computer', exact: true })
       .click();
     await page.getByRole('button', { name: 'Start game', exact: true }).tap();
     await expect(page.getByText('Your move', { exact: true })).toBeVisible({ timeout: 120000 });
@@ -187,7 +226,7 @@ test('draws with touch controls, keeps drawings per position and clears the view
     await page.reload();
     await page
       .getByRole('navigation', { name: 'Workspace' })
-      .getByRole('button', { name: 'Play Stockfish', exact: true })
+      .getByRole('button', { name: 'Play computer', exact: true })
       .click();
     await expect(page.locator('.annotation-arrow')).toHaveCount(1);
     await expect(page.locator('.board-overlay > rect')).toHaveCount(1);

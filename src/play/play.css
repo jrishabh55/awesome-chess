@@ -409,6 +409,41 @@
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
 }
+.play-opponent-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.play-opponent-options button {
+  min-height: 40px;
+  border: 1px solid #454c3d;
+  border-radius: 8px;
+  font-size: 13px;
+}
+.play-opponent-options .is-selected {
+  border-color: #b6d68c;
+  background: #35432c;
+}
+.play-practice-rating {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.play-practice-rating input {
+  width: 110px;
+  padding: 9px 10px;
+  border: 1px solid #454c3d;
+  border-radius: 8px;
+  background: #20221f;
+  color: #ecede6;
+  font: inherit;
+}
+.play-practice-rating input[aria-invalid='true'] {
+  border-color: #f1bd9c;
+}
 .play-side-options button {
   min-height: 40px;
   border: 1px solid #454c3d;

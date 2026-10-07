@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { BookOpen, Bot, ChartNoAxesCombined } from 'lucide-react';
 import ReviewWorkspace from './App';
 import { OpeningTeacher } from '../training/OpeningTeacher';
-import { PlayStockfish } from '../play/PlayStockfish';
+import { PlayComputer } from '../play/PlayComputer';
 import type { Study } from '../chess/types';
 import { assetUrl } from './asset-url';
 import './workspace.css';
@@ -35,7 +35,7 @@ export default function WorkspaceApp() {
             [
               { id: 'review', label: 'Review', name: 'Game review', icon: ChartNoAxesCombined },
               { id: 'teacher', label: 'Openings', name: 'Opening teacher', icon: BookOpen },
-              { id: 'play', label: 'Play', name: 'Play Stockfish', icon: Bot },
+              { id: 'play', label: 'Play', name: 'Play computer', icon: Bot },
             ] as const
           ).map((item) => (
             <button
@@ -57,7 +57,7 @@ export default function WorkspaceApp() {
         {mode === 'teacher' ? (
           <OpeningTeacher onBack={() => setMode('review')} />
         ) : mode === 'play' ? (
-          <PlayStockfish
+          <PlayComputer
             onBack={() => setMode('review')}
             onReview={(study) => {
               setIncomingStudy(study);

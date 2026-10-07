@@ -13,8 +13,77 @@ import {
   snapshotForReview,
   viewedStudy,
   nextOpeningMove,
+  changeGameOpponent,
   type PlaySession,
 } from './game';
+
+it('identifies Maia games and preserves their selected rating after reload', () => {
+  const settings = { ...defaultSettings, opponent: { kind: 'maia' as const, rating: 1320 } };
+  const game = advanceGame(createGame(settings), 'e2e4');
+  expect(game.study.headers.Black).toBe('Maia 3 · Practice 1320');
+  const raw = serializeSession({ game, settings, orientation: 'w', viewPly: 0 });
+  expect(JSON.parse(raw).version).toBe(2);
+  const restored = restoreSession(raw)!;
+  expect(restored.game!.opponent).toEqual({ kind: 'maia', rating: 1320 });
+  expect(restored.settings.opponent).toEqual({ kind: 'maia', rating: 1320 });
+  expect(restored.game!.study.mainline).toHaveLength(1);
+  expect(restored.viewPly).toBe(0);
+});
+
+it('changes opponents while retaining opening practice, move history and drawings', () => {
+  let game = advanceGame(createGame({ ...defaultSettings, opening: scandinavian }), 'e2e4');
+  game = annotateGame(game, 1, { kind: 'square', square: 'e4', color: 'blue' });
+  const changed = changeGameOpponent(game, { kind: 'maia', rating: 1600 });
+  expect(changed.study.id).toBe(game.study.id);
+  expect(changed.study.mainline).toEqual(game.study.mainline);
+  expect(changed.study.nodes).toEqual(game.study.nodes);
+  expect(changed.opening).toEqual(game.opening);
+  expect(nextOpeningMove(changed)).toBe('d7d5');
+  expect(changed.study.headers.Black).toBe('Maia 3 · Practice 1600');
+});
+
+it('rejects malformed opponent configurations instead of changing the saved strength', () => {
+  const game = createGame(defaultSettings);
+  for (const opponent of [
+    { kind: 'maia', rating: 599 },
+    { kind: 'maia', rating: 2601 },
+    { kind: 'maia', rating: 1320.5 },
+    { kind: 'maia', rating: '1320' },
+    { kind: 'other', rating: 1320 },
+    { kind: 'stockfish', strengthId: 'unknown' },
+  ]) {
+    const saved = JSON.parse(
+      serializeSession({ game, settings: defaultSettings, orientation: 'w' }),
+    );
+    saved.game.opponent = opponent;
+    expect(restoreSession(JSON.stringify(saved))).toBeNull();
+  }
+});
+
+it('migrates version 1 Elo games without changing their native strength or annotations', () => {
+  let game = advanceGame(createGame({ ...defaultSettings, strengthId: 'elo-1600' }), 'e2e4');
+  game = annotateGame(game, 0, { kind: 'square', square: 'd4', color: 'red' });
+  const saved = JSON.parse(
+    serializeSession({
+      game,
+      settings: { ...defaultSettings, strengthId: 'elo-1600' },
+      orientation: 'b',
+      viewPly: 0,
+    }),
+  );
+  saved.version = 1;
+  delete saved.settings.opponent;
+  delete saved.game.opponent;
+  const restored = restoreSession(JSON.stringify(saved))!;
+  expect(restored.game!.opponent).toEqual({ kind: 'stockfish', strengthId: 'elo-1600' });
+  expect(restored.game!.study.id).toBe(game.study.id);
+  expect(restored.game!.study.nodes.root.marks).toEqual([
+    { kind: 'square', square: 'd4', color: 'red' },
+  ]);
+  expect(restored.orientation).toBe('b');
+  expect(restored.viewPly).toBe(0);
+  expect(restored.game!.study.headers.Black).toBe('Stockfish 19 · Current saved strength');
+});
 
 const scandinavian = { name: 'Scandinavian Defense', eco: 'B01', pgn: '1. e4 d5 2. exd5 Qxd5' };
 it('follows a selected opening only while the live game matches its complete prefix', () => {

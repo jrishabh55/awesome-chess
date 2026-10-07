@@ -27,12 +27,13 @@ import { outcomeAt } from '../chess/outcome';
 import type { Color, DrawingColor, Mark, Study } from '../chess/types';
 import type { EngineLoadState } from '../engine/prepare-worker';
 import { GameOutcomeBadge } from '../ui/GameOutcomeBadge';
-import { PlayEngine } from './engine';
+import { createComputerEngine, type ComputerEngine } from './computer-engine';
+import { opponentFor, opponentKey, opponentLabel, opponentName, readOpponent } from './opponents';
 import {
   advanceGame,
   annotateGame,
   createGame,
-  changeGameStrength,
+  changeGameOpponent,
   nextOpeningMove,
   defaultSettings,
   navigateHistory,
@@ -96,7 +97,7 @@ function PlayDialog({
   );
 }
 
-export function PlayStockfish({
+export function PlayComputer({
   onReview,
 }: {
   onBack?: () => void;
@@ -125,7 +126,7 @@ export function PlayStockfish({
   const [thinking, setThinking] = useState(false);
   const [openingHint, setOpeningHint] = useState(false);
   const [retry, setRetry] = useState(0);
-  const engine = useRef<PlayEngine | null>(null);
+  const engine = useRef<ComputerEngine | null>(null);
   const game = session.game;
   const empty = useMemo(() => createStudy(), []);
   const study = game?.study || empty;
@@ -146,7 +147,17 @@ export function PlayStockfish({
   const outcome = useMemo(() => outcomeAt(study), [study]);
   const ended = Boolean(outcome);
   const human = game?.humanColor || 'w';
-  const selectedStrength = strengthFor(game?.strengthId || session.settings.strengthId);
+  const selectedOpponent = game?.opponent || opponentFor(session.settings);
+  const selectedKey = opponentKey(selectedOpponent);
+  const selectedLabel = opponentLabel(selectedOpponent);
+  const shortName = selectedOpponent.kind === 'maia' ? 'Maia 3' : 'Stockfish';
+  const draftOpponent = draft.opponent || opponentFor(draft);
+  const validDraft = Boolean(readOpponent(draftOpponent));
+  const draftStrengths =
+    draftOpponent.kind === 'stockfish' &&
+    !strengths.some((strength) => strength.id === draftOpponent.strengthId)
+      ? [...strengths, strengthFor(draftOpponent.strengthId)]
+      : strengths;
   const practice = useMemo(() => (game ? openingPractice(game) : { kind: 'off' as const }), [game]);
   const departure = useMemo(() => {
     if (!game || practice.kind !== 'diverged') return null;
@@ -201,7 +212,11 @@ export function PlayStockfish({
     };
   }, [setup, editingSettings, catalogRetry]);
   const openSettings = () => {
-    setDraft({ ...session.settings, strengthId: game?.strengthId || session.settings.strengthId });
+    setDraft({
+      ...session.settings,
+      strengthId: game?.strengthId || session.settings.strengthId,
+      opponent: selectedOpponent,
+    });
     setEditingSettings(Boolean(game));
     setSetup(true);
   };
@@ -216,7 +231,7 @@ export function PlayStockfish({
       return;
     }
     let active = true;
-    const client = new PlayEngine((state) => {
+    const client = createComputerEngine(game.opponent, (state) => {
       if (active) setLoad(state);
     });
     engine.current = client;
@@ -236,13 +251,14 @@ export function PlayStockfish({
       client.dispose();
       if (engine.current === client) engine.current = null;
     };
-  }, [game?.study.id, ended, retry, setup]);
+  }, [game?.study.id, selectedKey, ended, retry, setup]);
 
   useEffect(() => {
     if (!game || ended || setup || !ready || chess.turn() === human || !engine.current) return;
     const controller = new AbortController();
     const id = game.study.id,
       node = game.study.selectedId;
+    const requestedOpponent = opponentKey(game.opponent);
     setThinking(true);
     const scripted = nextOpeningMove(game);
     let openingTimer: ReturnType<typeof setTimeout> | undefined;
@@ -250,11 +266,7 @@ export function PlayStockfish({
       ? new Promise<string>((resolve) => {
           openingTimer = setTimeout(() => resolve(scripted), 550);
         })
-      : engine.current.bestMove(
-          positionAt(game.study, node),
-          selectedStrength.value,
-          controller.signal,
-        );
+      : engine.current.bestMove(positionAt(game.study, node), controller.signal);
     void reply
       .then((move) => {
         const latest = current.current;
@@ -262,7 +274,8 @@ export function PlayStockfish({
           controller.signal.aborted ||
           latest.game?.study.id !== id ||
           latest.game.study.selectedId !== node ||
-          latest.game.study.headers.Result !== '*'
+          latest.game.study.headers.Result !== '*' ||
+          opponentKey(latest.game.opponent) !== requestedOpponent
         )
           return;
         commit({ ...latest, game: advanceGame(latest.game, move) });
@@ -279,7 +292,7 @@ export function PlayStockfish({
       controller.abort();
       clearTimeout(openingTimer);
     };
-  }, [game?.study.id, game?.study.selectedId, game?.strengthId, ended, ready, human, setup]);
+  }, [game?.study.id, game?.study.selectedId, selectedKey, ended, ready, human, setup]);
 
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
@@ -341,6 +354,7 @@ export function PlayStockfish({
     }
   };
   const start = () => {
+    if (!validDraft) return;
     engine.current?.dispose();
     const opening =
       draft.opening && draft.followOpeningVariations !== false
@@ -364,11 +378,11 @@ export function PlayStockfish({
   };
   const applySettings = () => {
     const latest = current.current;
-    if (!latest.game) return;
+    if (!latest.game || !validDraft) return;
     commit({
       ...latest,
-      settings: { ...latest.settings, strengthId: draft.strengthId },
-      game: changeGameStrength(latest.game, draft.strengthId),
+      settings: { ...latest.settings, strengthId: draft.strengthId, opponent: draftOpponent },
+      game: changeGameOpponent(latest.game, draftOpponent),
     });
     setSetup(false);
   };
@@ -383,15 +397,15 @@ export function PlayStockfish({
         ? 'Draw'
         : outcome.winner === human
           ? 'You win!'
-          : 'Stockfish wins'
+          : `${shortName} wins`
       : engineError
         ? 'Engine paused'
         : !ready
           ? load.phase === 'downloading'
-            ? 'Downloading Stockfish…'
-            : 'Preparing Stockfish…'
+            ? `Downloading ${shortName}…`
+            : `Preparing ${shortName}…`
           : thinking || chess.turn() !== human
-            ? 'Stockfish is thinking…'
+            ? `${shortName} is thinking…`
             : 'Your move';
   const title = viewingHistory ? 'Viewing game history' : liveTitle;
   const subtitle = viewingHistory
@@ -401,8 +415,8 @@ export function PlayStockfish({
       : game
         ? chess.isCheck()
           ? 'Check — protect your king'
-          : `${human === 'w' ? 'White' : 'Black'} · No clock · ${selectedStrength.label}`
-        : 'Choose a strength and your side.';
+          : `${human === 'w' ? 'White' : 'Black'} · No clock · ${selectedLabel}`
+        : 'Choose an opponent and your side.';
   const progress = load.total ? Math.min(100, Math.round((load.loaded / load.total) * 100)) : 0;
   const player = (color: Color) => (
     <div className="play-player">
@@ -410,13 +424,9 @@ export function PlayStockfish({
         {color === human ? <User size={19} /> : <Bot size={20} />}
       </span>
       <span>
-        <strong>{color === human ? 'You' : 'Stockfish 19'}</strong>
+        <strong>{color === human ? 'You' : opponentName(selectedOpponent)}</strong>
         <small>
-          {color === human
-            ? color === 'w'
-              ? 'White pieces'
-              : 'Black pieces'
-            : selectedStrength.label}
+          {color === human ? (color === 'w' ? 'White pieces' : 'Black pieces') : selectedLabel}
         </small>
       </span>
       {displayOutcome && <GameOutcomeBadge outcome={displayOutcome} color={color} />}
@@ -427,10 +437,14 @@ export function PlayStockfish({
   );
 
   return (
-    <main className="play-stockfish" data-orientation={session.orientation}>
+    <main
+      className="play-stockfish"
+      data-orientation={session.orientation}
+      data-opponent={selectedOpponent.kind}
+    >
       <header className="play-header">
         <h1>
-          <Bot size={22} /> Play Stockfish
+          <Bot size={22} /> Play computer
         </h1>
         <span className="play-local">
           <Check size={14} /> On your device
@@ -657,8 +671,8 @@ export function PlayStockfish({
         >
           <p className="play-dialog-intro">
             {editingSettings
-              ? 'Change the opponent’s strength and continue your current game.'
-              : 'Choose your side, opponent strength, and an optional opening to practice.'}
+              ? 'Change your opponent or strength and continue your current game.'
+              : 'Choose your opponent, side, and an optional opening to practice.'}
           </p>
           {!editingSettings && (
             <fieldset>
@@ -722,7 +736,7 @@ export function PlayStockfish({
               </p>
               <p className="play-rating-note">
                 {draft.opening
-                  ? `${draft.opening.pgn} · Stockfish follows matching opening moves, then plays freely. If you leave the opening early, a banner offers to replay it.`
+                  ? `${draft.opening.pgn} · Your opponent follows matching opening moves, then plays freely. If you leave the opening early, a banner offers to replay it.`
                   : 'Leave this empty for a regular game. In opening practice you play your own moves from the starting position.'}
               </p>
               {catalogError && (
@@ -736,31 +750,98 @@ export function PlayStockfish({
             </fieldset>
           )}
           <fieldset>
-            <legend>Opponent strength</legend>
-            <div className="play-strength-options">
-              {strengths.map((strength) => (
+            <legend>Opponent</legend>
+            <div className="play-opponent-options" role="radiogroup" aria-label="Opponent">
+              {(['stockfish', 'maia'] as const).map((kind) => (
                 <button
-                  key={strength.id}
+                  key={kind}
                   role="radio"
-                  aria-checked={draft.strengthId === strength.id}
-                  className={draft.strengthId === strength.id ? 'is-selected' : ''}
-                  onClick={() => setDraft({ ...draft, strengthId: strength.id })}
+                  aria-checked={draftOpponent.kind === kind}
+                  className={draftOpponent.kind === kind ? 'is-selected' : ''}
+                  onClick={() =>
+                    setDraft({
+                      ...draft,
+                      opponent:
+                        kind === 'maia'
+                          ? { kind: 'maia', rating: 1320 }
+                          : { kind: 'stockfish', strengthId: draft.strengthId },
+                    })
+                  }
                 >
-                  <strong>{strength.label}</strong>
-                  <small>{strength.detail}</small>
-                  {draft.strengthId === strength.id && <Check size={16} />}
+                  {kind === 'maia' ? 'Maia' : 'Stockfish'}
                 </button>
               ))}
             </div>
           </fieldset>
-          <p className="play-rating-note">
-            Elo targets are approximate, not calibrated human ratings. This lightweight engine and
-            short thinking time affect playing strength. Skill 0 is Stockfish’s easiest setting.
-          </p>
+          {draftOpponent.kind === 'stockfish' ? (
+            <>
+              <fieldset>
+                <legend>Opponent strength</legend>
+                <div
+                  className="play-strength-options"
+                  role="radiogroup"
+                  aria-label="Opponent strength"
+                >
+                  {draftStrengths.map((strength) => (
+                    <button
+                      key={strength.id}
+                      role="radio"
+                      aria-checked={draftOpponent.strengthId === strength.id}
+                      className={draftOpponent.strengthId === strength.id ? 'is-selected' : ''}
+                      onClick={() =>
+                        setDraft({
+                          ...draft,
+                          strengthId: strength.id,
+                          opponent: { kind: 'stockfish', strengthId: strength.id },
+                        })
+                      }
+                    >
+                      <strong>{strength.label}</strong>
+                      <small>{strength.detail}</small>
+                      {draftOpponent.strengthId === strength.id && <Check size={16} />}
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+              <p className="play-rating-note">
+                These are engine difficulty settings. They are not calibrated human ratings.
+              </p>
+            </>
+          ) : (
+            <fieldset>
+              <label className="play-practice-rating">
+                Practice rating
+                <input
+                  type="number"
+                  min={600}
+                  max={2600}
+                  step={1}
+                  value={draftOpponent.rating || ''}
+                  onChange={(event) =>
+                    setDraft({
+                      ...draft,
+                      opponent: { kind: 'maia', rating: Number(event.target.value) },
+                    })
+                  }
+                  aria-describedby="maia-rating-note"
+                  aria-invalid={!validDraft}
+                />
+              </label>
+              <p id="maia-rating-note" className="play-rating-note">
+                Choose a whole number from 600 to 2600. Maia models human move choices at this
+                rating; its playing strength may vary. It downloads about 58 MB the first time, then
+                runs locally and works offline.
+              </p>
+            </fieldset>
+          )}
           {!editingSettings && game && !ended && (
             <p className="play-rating-note">Starting a new game replaces this unfinished game.</p>
           )}
-          <button className="play-primary" onClick={editingSettings ? applySettings : start}>
+          <button
+            className="play-primary"
+            disabled={!validDraft}
+            onClick={editingSettings ? applySettings : start}
+          >
             {editingSettings ? 'Apply settings' : 'Start game'} <ChevronRight size={18} />
           </button>
         </PlayDialog>

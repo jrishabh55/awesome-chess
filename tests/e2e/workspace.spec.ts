@@ -15,7 +15,7 @@ for (const viewport of [
     await page.getByRole('button', { name: 'Close dialog', exact: true }).click();
     const original = await page.locator('.chessboard').boundingBox();
     const menu = page.getByRole('navigation', { name: 'Workspace' });
-    for (const mode of ['Game review', 'Opening teacher', 'Play Stockfish']) {
+    for (const mode of ['Game review', 'Opening teacher', 'Play computer']) {
       await menu.getByRole('button', { name: mode, exact: true }).click();
       if (mode === 'Opening teacher') {
         await page.getByRole('button', { name: 'Openings', exact: true }).click();
@@ -26,7 +26,7 @@ for (const viewport of [
         await page.getByRole('checkbox', { name: 'Show thought bubbles', exact: true }).check();
         await page.getByRole('button', { name: 'Close opening dialog', exact: true }).click();
       }
-      if (mode === 'Play Stockfish') {
+      if (mode === 'Play computer') {
         await page.getByRole('button', { name: 'Start game', exact: true }).click();
         await expect(page.getByRole('heading', { name: 'Your move', exact: true })).toBeVisible();
         await page.getByRole('gridcell', { name: 'e2 white pawn', exact: true }).click();
@@ -117,7 +117,7 @@ test('reopening a played game creates an independent review and keeps new drawin
 }) => {
   await page.goto('./');
   const menu = page.getByRole('navigation', { name: 'Workspace' });
-  const play = () => menu.getByRole('button', { name: 'Play Stockfish', exact: true }).click();
+  const play = () => menu.getByRole('button', { name: 'Play computer', exact: true }).click();
   const mark = (square: string) =>
     page.getByRole('gridcell', { name: `${square} empty`, exact: true }).click({ button: 'right' });
   await play();
@@ -152,7 +152,7 @@ test('reopening a played game creates an independent review and keeps new drawin
       request.onsuccess = () => {
         resolve(
           request.result
-            .filter((s) => s.headers.Event === 'Casual game vs Stockfish')
+            .filter((s) => s.headers.Event === 'Casual game vs Stockfish 19')
             .map((s) => s.nodes[s.rootId].marks.map((m: { square: string }) => m.square).sort()),
         );
         db.close();
