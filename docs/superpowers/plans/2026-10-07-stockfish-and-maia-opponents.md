@@ -79,8 +79,21 @@
 - [x] Add a production-only test for verified Maia download, offline reload and legal reply at a non-root base; add an interrupted/missing download retry test.
 - [x] Build with `VITE_BASE_PATH=/awesome-chess/`, serve preview, and run targeted production browser tests. Expect actual Maia inference to complete without network after reload.
 - [x] Measure startup/reply latency, inspect desktop/mobile chooser layout, and update documentation and notices with actual asset size and rating meaning.
-- [ ] Run unit suite, typecheck, build, relevant browser suite, and a fresh code review; resolve material findings and report evidence.
+- [x] Run unit suite, typecheck, build, relevant browser suite, and a fresh code review; resolve material findings and report evidence.
 
 ## Execution
 
 The user's instruction “perfect, make the changes” authorizes implementation of the reviewed design. Execute inline in this session without another approval checkpoint. Keep a progress ledger in `.superpowers/sdd/2026-10-07-stockfish-and-maia-opponents/` and obtain one independent code review after implementation.
+
+
+## Implementation outcome
+
+Implemented on local branch `feat/stockfish-maia-opponents` in commit `fa7d122`. Full unit suite: **220/220**. Typecheck and production build pass. The final production browser run at `/awesome-chess/` passes **29/29**, covering real Stockfish settings, Maia inference for both colors, rating changes, scripted openings and branches, replay, reload, offline play, failed/interrupted downloads, review handoff, drawings, history and mobile geometry. The independent review found no Critical or Important issues.
+
+Decisions made during implementation:
+
+- Used a dedicated branch in the existing checkout to preserve unrelated working changes. If a separate worktree is preferred later, the branch can move without losing the files.
+- Retained `strengthId` as a compatibility alias alongside canonical opponent configuration, including older replay callers that directly change it. A future cleanup may require a migration or API adjustment.
+- Worker preparation returns the worker plus initialization resources so message handlers attach before initialization. This avoids dropped ready/error messages; changing the approach later would require an internal factory signature adjustment.
+
+Deferred minor from review: when Maia assets are absent while offline, a rejected network fetch can display the generic “Failed to fetch” error instead of explicit connection guidance. The saved game stays intact and the existing retry succeeds once connected. Error wording can be improved with rejected-fetch coverage.
