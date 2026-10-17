@@ -80,9 +80,11 @@ test('guided review replaces continuous analysis with bounded move assessments',
   await page.getByRole('textbox', { name: 'PGN or FEN' }).fill('1. e4 e5 2. Nf3 Nc6 *');
   await page.getByRole('button', { name: 'Import & explore' }).click();
   await page.getByRole('button', { name: 'Next move', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Start guided review', exact: true })).toBeVisible({
+  await expect(page.getByRole('region', { name: 'Move explanation' })).toBeVisible({
     timeout: 90000,
   });
+  // The compact move insight hides guided controls; start playback from the root.
+  await page.getByRole('button', { name: 'Go to start', exact: true }).click();
   await page.getByRole('button', { name: 'Review settings', exact: true }).click();
   await page.getByRole('checkbox', { name: 'Continuous analysis', exact: true }).check();
   await page.getByRole('button', { name: 'Close dialog', exact: true }).click();

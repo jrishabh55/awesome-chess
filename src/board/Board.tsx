@@ -39,6 +39,8 @@ interface Props {
   marks: Mark[];
   engineMarks?: Mark[];
   coachMarks?: Mark[];
+  remnantMarks?: Mark[];
+  threatMarks?: Mark[];
   onMove: (uci: string) => void;
   onToggleMark: (mark: Mark) => void;
   drawingMode: 'move' | 'arrow' | 'square';
@@ -58,6 +60,8 @@ export function Board({
   marks,
   engineMarks = [],
   coachMarks = [],
+  remnantMarks = [],
+  threatMarks = [],
   onMove,
   onToggleMark,
   drawingMode,
@@ -135,7 +139,13 @@ export function Board({
     if (selected && selected !== square) move(selected, square);
     else setSelected(chess.get(square)?.color === chess.turn() ? square : null);
   };
-  const allMarks = [...(hideHints ? [] : marks), ...(!hideHints ? engineMarks : []), ...coachMarks];
+  const allMarks = [
+    ...(hideHints ? [] : marks).map((mark) => ({ mark, overlay: 'drawing' })),
+    ...(hideHints ? [] : engineMarks).map((mark) => ({ mark, overlay: 'engine' })),
+    ...(hideHints ? [] : remnantMarks).map((mark) => ({ mark, overlay: 'previous-best' })),
+    ...(hideHints ? [] : threatMarks).map((mark) => ({ mark, overlay: 'threat' })),
+    ...coachMarks.map((mark) => ({ mark, overlay: 'coach' })),
+  ];
   const finishGesture = () => {
     if (frame.current !== null) cancelAnimationFrame(frame.current);
     frame.current = null;
@@ -208,11 +218,7 @@ export function Board({
               onToggleMark({ kind: 'arrow', from: g.from, to, color: g.color });
               setSelected(null);
             } else if (g.right || drawingMode === 'square') {
-              onToggleMark({
-                kind: 'square',
-                square: to,
-                color: g.color,
-              });
+              onToggleMark({ kind: 'square', square: to, color: g.color });
             } else activate(to, true);
           } else if (dragged && g.from !== to) move(g.from, to);
           else activate(to);
@@ -268,12 +274,14 @@ export function Board({
         })}
         <svg className="board-overlay board-square-layer" viewBox="0 0 8 8" aria-hidden="true">
           {allMarks
-            .filter((mark) => mark.kind === 'square')
-            .map((mark, i) => {
+            .filter(({ mark }) => mark.kind === 'square')
+            .map(({ mark, overlay }, i) => {
+              if (mark.kind !== 'square') return null;
               const p = squareToPoint(mark.square, orientation);
               return (
                 <rect
                   key={i}
+                  data-overlay={overlay}
                   x={p.x - 0.5}
                   y={p.y - 0.5}
                   width="1"
@@ -336,21 +344,24 @@ export function Board({
             ))}
           </defs>
           {allMarks
-            .filter((mark) => mark.kind === 'arrow')
-            .map((mark, i) => {
+            .filter(({ mark }) => mark.kind === 'arrow')
+            .map(({ mark, overlay }, i) => {
+              if (mark.kind !== 'arrow') return null;
               const a = squareToPoint(mark.from, orientation),
                 b = squareToPoint(mark.to, orientation),
                 shape = arrowShape(a, b);
               return (
                 <path
                   className="annotation-arrow"
+                  data-overlay={overlay}
+                  data-move={mark.from + mark.to}
                   key={i}
                   d={shape.path}
                   fill="none"
                   stroke={hues[mark.color]}
                   strokeWidth=".22"
-                  strokeDasharray={shape.strokeDasharray}
-                  opacity=".65"
+                  strokeDasharray={overlay === 'previous-best' ? '.18 .1' : shape.strokeDasharray}
+                  opacity={overlay === 'previous-best' ? '.4' : '.65'}
                   strokeLinecap="butt"
                   strokeLinejoin="round"
                   markerEnd={`url(#arrow-${mark.color})`}

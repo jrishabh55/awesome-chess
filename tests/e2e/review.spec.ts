@@ -77,7 +77,7 @@ test('engine arrows settle after navigation and pending suggestions stop when pa
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('combobox', { name: 'Engine build' }).selectOption('lite');
   await page.getByRole('button', { name: 'Close dialog' }).click();
-  const arrow = page.locator('.annotation-arrow');
+  const arrow = page.locator('.annotation-arrow[data-overlay="engine"]');
   await expect(arrow).toHaveCount(1, { timeout: 90000 });
   // Observe every frame: an old arrow must vanish, and an early candidate must not flash.
   const frames = await page.evaluate(async () => {
@@ -86,7 +86,7 @@ test('engine arrows settle after navigation and pending suggestions stop when pa
     const start = performance.now();
     while (performance.now() - start < 350) {
       await new Promise(requestAnimationFrame);
-      counts.push(document.querySelectorAll('.annotation-arrow').length);
+      counts.push(document.querySelectorAll('.annotation-arrow[data-overlay="engine"]').length);
     }
     return counts;
   });

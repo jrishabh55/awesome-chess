@@ -16,6 +16,7 @@ export function ReviewPanel({
   speed,
   onSpeed,
   onReport,
+  compact = false,
 }: {
   study: Study;
   assessments: Record<string, MoveAssessment>;
@@ -28,12 +29,13 @@ export function ReviewPanel({
   speed: 'quick' | 'deep';
   onSpeed: (speed: 'quick' | 'deep') => void;
   onReport?: () => void;
+  compact?: boolean;
 }) {
   const r = buildReport(study, assessments),
     done = r.w.analyzed + r.b.analyzed,
     total = study.mainline.length;
   return (
-    <div className="review-content">
+    <div className={`review-content${compact ? ' review-controls-compact' : ''}`}>
       {!onReport && (
         <div className="review-invitation">
           <div className="review-coach-icon">

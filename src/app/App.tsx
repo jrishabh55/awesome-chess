@@ -48,7 +48,8 @@ import { EngineClient, positionKey } from '../engine/worker-client';
 import type { AnalysisResult, EngineFlavor } from '../engine/types';
 import { scoreText } from '../engine/uci';
 import { assessMove, sanLine } from '../review/classify';
-import { isError, type MoveAssessment, type Evidence } from '../review/policy';
+import { analyzeSelectedMove } from '../review/selected-analysis';
+import { isError, reviewSearchProfile, type MoveAssessment, type Evidence } from '../review/policy';
 import { MoveList } from '../review/MoveList';
 import { AnalysisPanel } from '../review/AnalysisPanel';
 import { ReviewPanel, ReviewReport } from '../review/ReviewPanel';
@@ -57,6 +58,9 @@ import { ReviewMoveBanner } from '../coach/ReviewMoveBanner';
 import { useOpeningPreferences } from '../training/preferences';
 import { OpeningSettings } from '../training/OpeningSettings';
 import { keyMoments } from '../coach/explain';
+import { reviewInsight } from '../coach/review-insight';
+import { MoveInsight } from '../coach/MoveInsight';
+import './move-insight.css';
 import { startRetry, submitRetry, type RetrySession } from '../retry/session';
 import { loadOpenings, identifyOpening } from '../openings/lookup';
 import {
@@ -135,6 +139,7 @@ export default function App({
   const [result, setResult] = useState<AnalysisResult | null>(null),
     [engineStatus, setEngineStatus] = useState('Loading engine'),
     [assessments, setAssessments] = useState<Record<string, MoveAssessment>>({}),
+    [analysisReady, setAnalysisReady] = useState(false),
     [reviewing, setReviewing] = useState(false),
     [reviewCompleted, setReviewCompleted] = useState(0),
     [reviewSpeed, setReviewSpeed] = useState<'quick' | 'deep'>('quick'),
@@ -252,7 +257,9 @@ export default function App({
     };
   }, [flavor, depth, orientation, booted, engineLoad.phase === 'ready']);
   useEffect(() => {
+    let active = true;
     analysisLoaded.current = false;
+    setAnalysisReady(false);
     setAssessments({});
     const id = study.id;
     void loadAnalysis<{
@@ -262,6 +269,7 @@ export default function App({
     }>(id)
       .then((value) => {
         if (
+          active &&
           currentStudy.current.id === id &&
           value?.flavor === flavor &&
           value.engineBuild === ENGINE_BUILD_ID
@@ -270,8 +278,14 @@ export default function App({
       })
       .catch(() => {})
       .finally(() => {
-        analysisLoaded.current = true;
+        if (active) {
+          analysisLoaded.current = true;
+          setAnalysisReady(true);
+        }
       });
+    return () => {
+      active = false;
+    };
   }, [study.id, flavor]);
   useEffect(() => {
     if (booted && analysisLoaded.current && Object.keys(assessments).length)
@@ -285,7 +299,17 @@ export default function App({
     if (currentStudy.current.id === id) setAssessments((old) => ({ ...old, [a.nodeId]: a }));
   };
   useEffect(() => {
-    if (!booted || !openingReady || !engineOn || retry || demo || reviewing) return;
+    if (
+      !booted ||
+      !analysisReady ||
+      !analysisLoaded.current ||
+      !openingReady ||
+      !engineOn ||
+      retry ||
+      demo ||
+      reviewing
+    )
+      return;
     const abort = new AbortController();
     engineAbort.current = abort;
     const s = study,
@@ -294,34 +318,24 @@ export default function App({
     setEngineStatus('Analyzing');
     void (async () => {
       try {
-        const r = await engine.analyze(
-          {
-            id: `interactive:${s.id}:${node}`,
-            position: positionAt(s, node),
-            budget: infinite && !guidedReview ? { kind: 'infinite' } : { kind: 'depth', depth },
-            multiPv: 3,
-          },
-          abort.signal,
-          (partial) => {
+        await analyzeSelectedMove({
+          study: s,
+          engine,
+          signal: abort.signal,
+          depth,
+          infinite: infinite && !guidedReview,
+          getAssessment: () => assessmentRef.current[node],
+          onAssessment: (assessment) => storeAssessment(assessment, s.id),
+          onResult: (partial) => {
             if (!abort.signal.aborted) {
               setResult(partial);
               setEngineLoad({ phase: 'ready', loaded: 0, total: 0 });
             }
           },
-        );
+        });
         if (abort.signal.aborted) return;
-        setResult(r);
         setEngineStatus('Ready');
         setEngineLoad({ phase: 'ready', loaded: 0, total: 0 });
-        const existing = assessmentRef.current[node];
-        if (
-          node !== s.rootId &&
-          (!existing || (existing.depth < depth && existing.reviewProfile !== `quick:${depth}`)) &&
-          !reviewing
-        ) {
-          const a = await assessMove(s, node, engine, abort.signal, depth, 'interactive', 'quick');
-          if (!abort.signal.aborted) storeAssessment(a, s.id);
-        }
       } catch (e) {
         if (!abort.signal.aborted) {
           setEngineStatus('Unavailable');
@@ -337,6 +351,7 @@ export default function App({
     engine,
     depth,
     booted,
+    analysisReady,
     openingReady,
     engineOn,
     infinite,
@@ -489,7 +504,7 @@ export default function App({
     const s = currentStudy.current;
     setReviewing(true);
     setReviewCompleted(0);
-    const profile = `${reviewSpeed}:${depth}`;
+    const profile = reviewSearchProfile(reviewSpeed, depth);
     const force = s.mainline.every((id) => assessmentRef.current[id]?.reviewProfile === profile);
     try {
       await loadOpenings();
@@ -546,7 +561,7 @@ export default function App({
     }
     try {
       setStudy((s) => playMove(s, s.selectedId, uci));
-      setTab('analysis');
+      setTab((current) => (current === 'review' ? 'review' : 'analysis'));
     } catch (e) {
       setError(errorMessage(e));
     }
@@ -591,15 +606,35 @@ export default function App({
     }
   };
   const selectedAssessment = assessments[study.selectedId];
+  const insight = useMemo(
+    () => (selectedAssessment ? reviewInsight(study, selectedAssessment) : undefined),
+    [study, selectedAssessment],
+  );
   const opening = openingReady ? identifyOpening(study, study.selectedId) : null;
   const showDemo = (e?: Evidence) => {
     if (!selectedAssessment) return;
     const root = e?.root || positionAt(study, study.nodes[study.selectedId].parentId!);
     setDemo({
       position: root,
-      line: e?.line || selectedAssessment.bestLine,
-      index: 0,
-      frames: e?.frames || [],
+      line: e?.line || insight?.bestLine || selectedAssessment.bestLine,
+      index: e?.frames[0]?.ply || 0,
+      frames: e?.frames.map((frame) => ({
+        ...frame,
+        marks: frame.marks.map((mark) => ({
+          ...mark,
+          color: e.kind === 'pin' || e.kind === 'fork' ? 'red' : mark.color,
+        })),
+      })) || [{ ply: 0, marks: insight?.remnant || [] }],
+    });
+    setAutoplay(false);
+  };
+  const showPlayedLine = () => {
+    if (!insight) return;
+    setDemo({
+      position: positionAt(study, study.nodes[study.selectedId].parentId!),
+      line: insight.playedLine,
+      index: 1,
+      frames: [{ ply: 1, marks: insight.threats.flatMap((t) => t.marks) }],
     });
     setAutoplay(false);
   };
@@ -687,8 +722,17 @@ export default function App({
             kind: 'arrow',
             from: bestMove.slice(0, 2) as any,
             to: bestMove.slice(2, 4) as any,
-            color: 'green',
+            color: insight ? 'blue' : 'green',
           },
+        ]
+      : [];
+  const remnantMarks = showArrow && insight && !retry && !demo ? insight.remnant : [];
+  const threatMarks =
+    showCoach && insight && !retry && !demo
+      ? [
+          ...new Map(
+            insight.threats.flatMap((t) => t.marks).map((m) => [JSON.stringify(m), m]),
+          ).values(),
         ]
       : [];
   const evalScore = displayResult?.lines[0]?.score;
@@ -968,14 +1012,19 @@ export default function App({
   const coachDetails = !retry && !demo && showCoach && selectedAssessment && (
     <CoachCard
       assessment={selectedAssessment}
+      study={study}
       san={study.nodes[study.selectedId].san || ''}
       onRetry={() => {
         setModal(null);
         beginRetry();
       }}
-      onShow={() => {
+      onShow={(e) => {
         setModal(null);
-        showDemo();
+        showDemo(e);
+      }}
+      onPlayed={() => {
+        setModal(null);
+        showPlayedLine();
       }}
       onNext={() => jumpMoment(1)}
       onPrevious={() => jumpMoment(-1)}
@@ -1110,6 +1159,8 @@ export default function App({
               marks: demo || retry ? [] : study.nodes[study.selectedId].marks,
               engineMarks,
               coachMarks,
+              remnantMarks,
+              threatMarks,
               onMove,
               onToggleMark: (m) => {
                 if (!demo && !retry) setStudy((s) => toggleMark(s, s.selectedId, m));
@@ -1172,7 +1223,9 @@ export default function App({
               </div>
             )}
           </ModeBoard>
-          <section className="analysis-column">
+          <section
+            className={`analysis-column${!retry && !demo && tab === 'review' && showCoach && insight ? ' has-review-insight' : ''}`}
+          >
             <div className="review-topline">
               <span>
                 <strong>
@@ -1285,29 +1338,43 @@ export default function App({
               {retry ? (
                 retryControls
               ) : tab === 'review' ? (
-                <ReviewPanel
-                  study={study}
-                  assessments={assessments}
-                  reviewing={reviewing}
-                  completed={reviewCompleted}
-                  speed={reviewSpeed}
-                  onSpeed={setReviewSpeed}
-                  onReport={() => openSettings('report')}
-                  onReview={runReview}
-                  onStop={() => {
-                    reviewAbort.current?.abort();
-                    setReviewing(false);
-                  }}
-                  onSelect={navigate}
-                  onGuide={() => {
-                    setInfinite(false);
-                    setShowCoach(true);
-                    navigate(study.rootId);
-                    resumedMoment.current = null;
-                    setGuidedReview(true);
-                    setAutoplay(true);
-                  }}
-                />
+                <>
+                  {!demo && showCoach && insight && selectedAssessment && (
+                    <MoveInsight
+                      key={study.selectedId}
+                      assessment={selectedAssessment}
+                      insight={insight}
+                      san={study.nodes[study.selectedId].san || ''}
+                      onDetails={() => openSettings('coach')}
+                      onBest={() => showDemo()}
+                      onWhy={showPlayedLine}
+                    />
+                  )}
+                  <ReviewPanel
+                    compact={Boolean(!demo && showCoach && insight)}
+                    study={study}
+                    assessments={assessments}
+                    reviewing={reviewing}
+                    completed={reviewCompleted}
+                    speed={reviewSpeed}
+                    onSpeed={setReviewSpeed}
+                    onReport={() => openSettings('report')}
+                    onReview={runReview}
+                    onStop={() => {
+                      reviewAbort.current?.abort();
+                      setReviewing(false);
+                    }}
+                    onSelect={navigate}
+                    onGuide={() => {
+                      setInfinite(false);
+                      setShowCoach(true);
+                      navigate(study.rootId);
+                      resumedMoment.current = null;
+                      setGuidedReview(true);
+                      setAutoplay(true);
+                    }}
+                  />
+                </>
               ) : tab === 'openings' ? (
                 <div className="opening-panel">
                   <div className="opening-icon">

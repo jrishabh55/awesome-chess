@@ -1,6 +1,8 @@
 import { it, expect } from 'vitest';
-import { classify, detectEvidence } from './classify';
-import type { EngineLine } from '../engine/types';
+import { assessMove, classify, detectEvidence } from './classify';
+import { createStudy, playMove } from '../chess/tree';
+import type { AnalyzeRequest, EngineLine } from '../engine/types';
+import type { EngineClient } from '../engine/worker-client';
 const line = (cp: number, pv: string[]): EngineLine => ({
   rank: 1,
   depth: 16,
@@ -96,3 +98,84 @@ it.each([12, 20])(
     expect(result.evidence.some((e) => e.kind === 'unique')).toBe(false);
   },
 );
+
+const f4Study = () => {
+  const study = createStudy('3r4/p4p1p/1p3k2/1P2RP2/3p2P1/3P4/P4P1P/6K1 w - - 1 29');
+  return playMove(study, study.rootId, 'f4');
+};
+
+it.each(['quick', 'deep'] as const)(
+  '%s review rechecks a false blunder even without a material or mating opportunity',
+  async (speed) => {
+    const study = f4Study();
+    const requests: AnalyzeRequest[] = [];
+    const engine = {
+      analyze: async (request: AnalyzeRequest) => {
+        requests.push(request);
+        const verified =
+          request.budget.kind === 'time'
+            ? request.budget.milliseconds > 900
+            : request.budget.kind === 'depth' && request.budget.depth >= 20;
+        const lines = request.rootMoves
+          ? [{ ...line(verified ? 583 : 139, ['f2f4', 'd8g8']), depth: verified ? 22 : 16 }]
+          : [
+              { ...line(verified ? 610 : 557, ['e5e4', 'a7a6']), depth: verified ? 22 : 16 },
+              { ...line(400, ['e5e2']), rank: 2, depth: verified ? 22 : 16 },
+              { ...line(390, ['e5e1']), rank: 3, depth: verified ? 22 : 16 },
+            ];
+        return {
+          requestId: request.id,
+          engineId: 'Stockfish 19',
+          profileId: 'full:full-strength',
+          positionKey: JSON.stringify(request.position),
+          lines,
+          completed: true,
+        };
+      },
+    } as unknown as EngineClient;
+    const assessment = await assessMove(
+      study,
+      study.selectedId,
+      engine,
+      new AbortController().signal,
+      16,
+      'review',
+      speed,
+    );
+    expect(assessment.base).toBe('Excellent');
+    expect(assessment.after).toEqual({ kind: 'cp', value: 583 });
+    expect(assessment.depth).toBe(22);
+    expect(requests.every((request) => request.position.moves.length === 0)).toBe(true);
+  },
+);
+
+it('retains a real blunder when the stronger comparison confirms the loss', async () => {
+  const study = f4Study();
+  const engine = {
+    analyze: async (request: AnalyzeRequest) => ({
+      requestId: request.id,
+      engineId: 'Stockfish 19',
+      profileId: 'full:full-strength',
+      positionKey: JSON.stringify(request.position),
+      completed: true,
+      lines: request.rootMoves
+        ? [{ ...line(-200, ['f2f4', 'd8g8']), depth: 22 }]
+        : [
+            { ...line(557, ['e5e4']), depth: 22 },
+            { ...line(400, ['e5e2']), rank: 2, depth: 22 },
+            { ...line(390, ['e5e1']), rank: 3, depth: 22 },
+          ],
+    }),
+  } as unknown as EngineClient;
+  const assessment = await assessMove(
+    study,
+    study.selectedId,
+    engine,
+    new AbortController().signal,
+    16,
+    'review',
+    'quick',
+  );
+  expect(assessment.base).toBe('Blunder');
+  expect(assessment.after).toEqual({ kind: 'cp', value: -200 });
+});

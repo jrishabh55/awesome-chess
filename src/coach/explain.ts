@@ -2,9 +2,14 @@ import type { Study } from '../chess/types';
 import type { Evidence, MoveAssessment } from '../review/policy';
 import { isError } from '../review/policy';
 import { scoreText } from '../engine/uci';
-export function explainMove(a: MoveAssessment): {
+import { reviewInsight, type ReviewInsight } from './review-insight';
+export function explainMove(
+  a: MoveAssessment,
+  study?: Study,
+): {
   text: string;
   actions: { label: string; evidence: Evidence }[];
+  review?: ReviewInsight;
 } {
   const intros = {
     Brilliant: 'A sound sacrifice. Giving up material keeps your position strong.',
@@ -40,7 +45,7 @@ export function explainMove(a: MoveAssessment): {
                   ? 'Show sacrifice'
                   : 'Show missed idea',
     }));
-  return { text, actions };
+  return { text, actions, review: study ? reviewInsight(study, a) : undefined };
 }
 export function keyMoments(
   s: Study,

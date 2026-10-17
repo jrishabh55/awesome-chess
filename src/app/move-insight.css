@@ -1,0 +1,164 @@
+.move-insight {
+  padding: 10px 12px;
+  background: #2e3328;
+  border-bottom: 1px solid #474c40;
+}
+.move-insight header,
+.move-insight header strong {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.move-insight header {
+  justify-content: space-between;
+  min-height: 20px;
+}
+.move-insight header strong {
+  font-size: 13px;
+}
+.move-insight header small {
+  font-size: 10px;
+  color: #b6bfaa;
+}
+.insight-best {
+  font-size: 11px;
+  color: #bddb98;
+  margin-top: 3px;
+}
+.insight-best > span {
+  color: #abb5a1;
+  font-size: 9px;
+}
+.insight-tabs {
+  display: flex;
+  gap: 4px;
+  margin-top: 5px;
+}
+.insight-tabs button {
+  flex: 1;
+  font-size: 11px;
+  padding: 4px;
+  border-bottom: 2px solid transparent;
+  color: #b7bdb0;
+}
+.insight-tabs button[aria-selected='true'] {
+  border-color: #a6cd77;
+  color: #e0edcc;
+}
+.move-insight > p {
+  font-size: 12px;
+  line-height: 1.4;
+  height: 50.4px;
+  margin: 6px 0;
+  color: #e0e3d9;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+.insight-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 5px;
+}
+.insight-actions button {
+  font-size: 11px;
+  color: #c0dfa0;
+  padding: 3px 0;
+}
+.insight-actions button:hover {
+  text-decoration: underline;
+}
+.compact-review .review-controls-compact {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 5px 12px;
+  background: #262a23;
+}
+.compact-review .review-controls-compact .review-highlights,
+.compact-review .review-controls-compact .local-note,
+.compact-review .review-controls-compact .guided-review {
+  display: none;
+}
+.compact-review .review-controls-compact .review-action {
+  flex: 1;
+}
+.compact-review .review-controls-compact .review-action > .primary {
+  min-height: 26px;
+  padding: 4px 6px;
+  font-size: 11px;
+  box-shadow: none;
+  gap: 4px;
+}
+.compact-review .review-controls-compact .review-action > .primary svg {
+  width: 12px;
+  height: 12px;
+}
+.compact-review .review-controls-compact .report-link {
+  font-size: 10px;
+}
+.coach-evidence {
+  font-size: 13px;
+  line-height: 1.55;
+}
+.coach-evidence h4 {
+  margin: 14px 0 4px;
+  color: #d4e6bf;
+}
+.coach-evidence p {
+  margin: 6px 0;
+  color: #c8cfbe;
+}
+.coach-evidence small {
+  color: #a8b39c;
+}
+@media (max-width: 900px), (max-height: 650px) {
+  .compact-review .has-review-insight .moves-heading {
+    display: none;
+  }
+  .compact-review .has-review-insight .starting-position {
+    display: none;
+  }
+  .compact-review .has-review-insight > .move-list {
+    min-height: 54px;
+  }
+  .move-insight {
+    padding: 4px 9px;
+  }
+  .move-insight header {
+    min-height: 18px;
+  }
+  .move-insight header strong {
+    font-size: 11px;
+  }
+  .insight-best {
+    margin-top: 1px;
+    font-size: 10px;
+  }
+  .insight-tabs {
+    margin-top: 2px;
+  }
+  .insight-tabs button {
+    padding: 2px 4px;
+    font-size: 10px;
+  }
+  .move-insight > p {
+    font-size: 11px;
+    line-height: 14px;
+    height: 28px;
+    margin: 2px 0;
+    -webkit-line-clamp: 2;
+  }
+  .insight-actions button {
+    font-size: 10px;
+    padding: 2px 0;
+  }
+  .compact-review .review-controls-compact {
+    padding: 2px 9px;
+  }
+  .compact-review .review-controls-compact .review-action > .primary {
+    min-height: 23px;
+    padding: 2px 6px;
+  }
+}

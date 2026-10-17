@@ -8,6 +8,7 @@ import {
   baseLabel,
   primaryLabel,
   scoreExpected,
+  ASSESSMENT_SEARCH_VERSION,
   type Evidence,
   type MoveAssessment,
 } from './policy';
@@ -70,6 +71,7 @@ export function classify(i: Input): MoveAssessment {
     evidence: i.evidence,
     depth: Math.min(i.best.depth, i.played.depth),
     policyVersion: 1,
+    searchVersion: ASSESSMENT_SEARCH_VERSION,
     meaningful: i.legalCount > 1 && ((best >= 0.1 && best <= 0.9) || flags.great),
     criticalGap: gap,
     before: i.best.score,
@@ -228,6 +230,7 @@ export async function assessMove(
     legal = c.moves({ verbose: true }).map((m) => m.from + m.to + (m.promotion || ''));
   let sequence = 0;
   let verificationSearch = false;
+  let verificationMilliseconds = 900;
   const search = async (p: PositionInput, d: number, multiPv = 1, rootMoves?: string[]) =>
     engine.analyze(
       {
@@ -235,7 +238,7 @@ export async function assessMove(
         position: p,
         budget:
           speed === 'quick'
-            ? { kind: 'time', milliseconds: verificationSearch ? 900 : 250 }
+            ? { kind: 'time', milliseconds: verificationSearch ? verificationMilliseconds : 250 }
             : { kind: 'depth', depth: d },
         multiPv,
         rootMoves,
@@ -288,9 +291,13 @@ export async function assessMove(
     (e) => e.kind === 'mate' || e.kind === 'material',
   );
   const candidateMiss = provisional.loss > 0.03 && opportunities.length > 0;
-  if (candidateSacrifice || candidateGreat || candidateMiss) {
+  // A short search can underestimate a sound move even without a tactical
+  // opportunity in its PV. Verify the loss itself before keeping a severe label.
+  const candidateError = ['Mistake', 'Blunder'].includes(provisional.base);
+  if (candidateError || candidateSacrifice || candidateGreat || candidateMiss) {
     verificationSearch = true;
-    const verifyDepth = Math.max(18, depth + 2);
+    if (candidateError) verificationMilliseconds = 2000;
+    const verifyDepth = Math.max(candidateError ? 20 : 18, depth + 2);
     result = await search(root, verifyDepth, Math.min(3, legal.length));
     best = result.lines[0];
     second = result.lines[1];

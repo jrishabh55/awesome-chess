@@ -55,6 +55,7 @@ export interface MoveAssessment {
   evidence: Evidence[];
   depth: number;
   policyVersion: 1;
+  searchVersion?: number;
   reviewProfile?: string;
   meaningful: boolean;
   criticalGap: number;
@@ -66,6 +67,10 @@ export interface MoveAssessment {
 }
 export const isError = (label: Label) =>
   ['Inaccuracy', 'Mistake', 'Blunder', 'Miss'].includes(label);
+// Search changes invalidate old assessments without changing the scoring formula.
+export const ASSESSMENT_SEARCH_VERSION = 2;
+export const reviewSearchProfile = (speed: 'quick' | 'deep', depth: number) =>
+  `${speed}:${depth}:v${ASSESSMENT_SEARCH_VERSION}`;
 export function baseLabel(loss: number, isBest: boolean): Label {
   return isBest
     ? 'Best'
